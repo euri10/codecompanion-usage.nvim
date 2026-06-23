@@ -132,14 +132,13 @@ function M.compact(snapshot)
   local s = second and second.remaining_percent
   local reset = second and util.format_reset(second.reset_at)
 
-  -- Use "pct" instead of "%" to avoid statusline %-escaping madness.
-  -- e.g. "Codex 75pct/50pct 2.3d"
+  -- Emit escaped percent signs so the statusline renders a literal "%".
   if p and s then
-    return string.format("%s %.0fpct/%.0fpct%s", provider, p, s, reset and (" " .. reset) or "")
+    return string.format("%s %.0f%%%%/%.0f%%%%%s", provider, p, s, reset and (" " .. reset) or "")
   end
 
   if p then
-    return string.format("%s %.0fpct%s", provider, p, reset and (" " .. reset) or "")
+    return string.format("%s %.0f%%%%%s", provider, p, reset and (" " .. reset) or "")
   end
 
   return provider .. " n/a"
