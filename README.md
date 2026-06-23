@@ -5,6 +5,7 @@ A Neovim extension for [codecompanion.nvim](https://github.com/olimorris/codecom
 Shows usage statistics for:
 - **Codex** (OpenAI Codex CLI) – reads auth from `~/.codex/auth.json` and queries the Codex usage API
 - **Claude Code** (Anthropic Claude Code) – reads OAuth credentials from `~/.claude/.credentials.json` and queries the Anthropic OAuth usage API.
+- **DeepSeek** (DeepSeek API) – reads API key from `~/.deepseek/api_key` or `DEEPSEEK_API_KEY` env var and queries the DeepSeek balance API.
 
 Built following the architecture of [CodexBar](https://github.com/steipete/CodexBar).
 
@@ -24,6 +25,7 @@ Using **lazy.nvim**:
           providers = {
             codex = { enabled = true },
             claude_code = { enabled = true },
+            deepseek_acp = { enabled = true },
           },
         })
       end,
@@ -42,11 +44,14 @@ Reads the OAuth access token from `~/.claude/.credentials.json` and calls `https
 
 > **Note:** The Claude OAuth token in `.credentials.json` may become stale because the Claude CLI does not always write refreshed tokens back to this file. If you see an authentication error, run `claude login` (or simply use `claude` interactively) to refresh your session, then try again.
 
+### DeepSeek Provider
+Reads the API key from `$DEEPSEEK_API_KEY` environment variable or `~/.deepseek/api_key` file and calls the DeepSeek balance API at `https://api.deepseek.com/user/balance`. Get your API key from [platform.deepseek.com](https://platform.deepseek.com/api_keys).
+
 ## Configuration
 
 ```lua
 require("codecompanion._extensions.usage").setup({
-  default_provider = "codex",       -- or "claude_code"
+  default_provider = "codex",       -- or "claude_code" or "deepseek_acp"
   auto_refresh = true,
   auto_refresh_debounce_ms = 2000,
   refresh_interval_sec = 300,       -- periodic refresh (0 = disabled)
@@ -65,6 +70,12 @@ require("codecompanion._extensions.usage").setup({
       -- credentials_path = "~/.claude/.credentials.json",
       -- usage_endpoint = "https://api.anthropic.com/api/oauth/usage",
       -- allow_token_refresh = true,
+      -- timeout_ms = 10000,
+    },
+    deepseek_acp = {
+      enabled = true,
+      -- endpoint = "https://api.deepseek.com/user/balance",
+      -- api_key_path = "~/.deepseek/api_key",
       -- timeout_ms = 10000,
     },
   },

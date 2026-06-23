@@ -20,6 +20,7 @@ local defaults = {
     codex = { enabled = true },
     claude_code = { enabled = true },
     copilot_acp = { enabled = true },
+    deepseek_acp = { enabled = true },
   },
 }
 
@@ -54,6 +55,9 @@ local function display_provider_name(name)
   end
   if canonical == "copilot_acp" then
     return "Copilot"
+  end
+  if canonical == "deepseek_acp" then
+    return "DeepSeek"
   end
   if not canonical then
     return "usage"
@@ -238,6 +242,7 @@ end
 -- (e.g. "Copilot" / "copilot_acp" for the ACP-based Copilot adapter).
 local ADAPTER_ALIASES = {
   copilot = "copilot_acp",
+  deepseek = "deepseek_acp",
 }
 
 ---Given a codecompanion adapter name, return the matching provider name if it exists.
