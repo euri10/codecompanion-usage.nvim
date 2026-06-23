@@ -373,11 +373,21 @@ end
 function M.refresh(cb)
   local opts = M.opts or defaults
 
+  if vim.g.codecompanion_debug then
+    vim.notify("[usage:claude_code] refresh: starting", vim.log.levels.DEBUG)
+  end
+
   -- 1. Load credentials → OAuth API
   local creds, creds_err = load_credentials(opts)
   if not creds then
+    if vim.g.codecompanion_debug then
+      vim.notify(string.format("[usage:claude_code] refresh: no creds (%s), cli_fallback=%s", tostring(creds_err), tostring(opts.allow_cli_fallback)), vim.log.levels.WARN)
+    end
     if opts.allow_cli_fallback then
       fetch_cli_simple_async(opts, function(data, err)
+        if vim.g.codecompanion_debug then
+          vim.notify(string.format("[usage:claude_code] refresh: CLI fallback result err=%s data=%s", tostring(err), tostring(data ~= nil)), vim.log.levels.DEBUG)
+        end
         cb(normalize_cli_simple(data), err)
       end)
       return
@@ -385,9 +395,27 @@ function M.refresh(cb)
     return cb(nil, creds_err)
   end
 
+  if vim.g.codecompanion_debug then
+    vim.notify(
+      string.format("[usage:claude_code] refresh: creds loaded, token_expired=%s allow_refresh=%s",
+        tostring(is_token_expired(creds)), tostring(opts.allow_token_refresh)),
+      vim.log.levels.DEBUG
+    )
+  end
+
   -- 2. Optionally refresh, then call OAuth API
   local function call_oauth()
+    if vim.g.codecompanion_debug then
+      vim.notify("[usage:claude_code] refresh: calling OAuth usage API", vim.log.levels.DEBUG)
+    end
     fetch_oauth_usage_async(creds.access_token, opts, function(data, err)
+      if vim.g.codecompanion_debug then
+        vim.notify(
+          string.format("[usage:claude_code] refresh: OAuth response err=%s data=%s windows=%d",
+            tostring(err), tostring(data ~= nil), data and #(data.windows or {}) or 0),
+          vim.log.levels.DEBUG
+        )
+      end
       if data and not err then
         local snap = normalize_oauth_usage(data, creds)
         if snap and #snap.windows > 0 then
@@ -395,6 +423,9 @@ function M.refresh(cb)
         end
         -- No windows → try CLI
         if opts.allow_cli_fallback then
+          if vim.g.codecompanion_debug then
+            vim.notify("[usage:claude_code] refresh: OAuth returned empty windows, trying CLI fallback", vim.log.levels.DEBUG)
+          end
           return fetch_cli_simple_async(opts, function(d, _)
             cb(normalize_cli_simple(d), nil)
           end)
@@ -404,6 +435,9 @@ function M.refresh(cb)
 
       -- OAuth failed → CLI
       if opts.allow_cli_fallback then
+        if vim.g.codecompanion_debug then
+          vim.notify("[usage:claude_code] refresh: OAuth failed, trying CLI fallback", vim.log.levels.DEBUG)
+        end
         return fetch_cli_simple_async(opts, function(d, _)
           cb(normalize_cli_simple(d), err)
         end)
@@ -413,6 +447,9 @@ function M.refresh(cb)
   end
 
   if is_token_expired(creds) and opts.allow_token_refresh then
+    if vim.g.codecompanion_debug then
+      vim.notify("[usage:claude_code] refresh: token expired, refreshing", vim.log.levels.DEBUG)
+    end
     refresh_token_async(creds, opts, function(new_creds, _)
       if new_creds then
         creds = new_creds

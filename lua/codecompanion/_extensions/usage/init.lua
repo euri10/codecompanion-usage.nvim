@@ -60,11 +60,31 @@ local function setup_providers()
   state.providers = {}
   for name, provider_opts in pairs(state.opts.providers or {}) do
     if provider_opts.enabled ~= false then
+      if vim.g.codecompanion_debug then
+        vim.notify(string.format("[usage] setup_providers: loading provider '%s'", name), vim.log.levels.DEBUG)
+      end
       local provider = load_provider(name, provider_opts)
       if provider then
         state.providers[name] = provider
+        if vim.g.codecompanion_debug then
+          vim.notify(string.format("[usage] setup_providers: provider '%s' loaded successfully", name), vim.log.levels.DEBUG)
+        end
+      else
+        if vim.g.codecompanion_debug then
+          vim.notify(
+            string.format("[usage] setup_providers: provider '%s' FAILED to load: %s", name, tostring(state.last_errors[name])),
+            vim.log.levels.ERROR
+          )
+        end
       end
     end
+  end
+  if vim.g.codecompanion_debug then
+    local names = {}
+    for name, _ in pairs(state.providers) do
+      table.insert(names, name)
+    end
+    vim.notify(string.format("[usage] setup_providers done: loaded providers=%s", vim.inspect(names)), vim.log.levels.DEBUG)
   end
 end
 
@@ -119,15 +139,30 @@ end
 ---@param provider_name string
 ---@param bufnr number
 local function refresh_and_update_stl(provider_name, bufnr)
+  if vim.g.codecompanion_debug then
+    vim.notify(string.format("[usage] refresh_and_update_stl: refreshing '%s' for bufnr=%d", provider_name, bufnr), vim.log.levels.DEBUG)
+  end
   refresh_provider(provider_name, function(snapshot, err)
     vim.schedule(function()
       local text
       if err then
         text = (state.opts.providers[provider_name] and state.opts.providers[provider_name].label or provider_name) .. " err"
+        if vim.g.codecompanion_debug then
+          vim.notify(string.format("[usage] refresh_and_update_stl: '%s' error: %s", provider_name, tostring(err)), vim.log.levels.ERROR)
+        end
       elseif snapshot then
         text = render.compact(snapshot)
+        if vim.g.codecompanion_debug then
+          vim.notify(
+            string.format("[usage] refresh_and_update_stl: '%s' snapshot=%s compact=%s", provider_name, vim.inspect(snapshot), text),
+            vim.log.levels.DEBUG
+          )
+        end
       else
         text = provider_name .. " n/a"
+        if vim.g.codecompanion_debug then
+          vim.notify(string.format("[usage] refresh_and_update_stl: '%s' no snapshot, no error", provider_name), vim.log.levels.DEBUG)
+        end
       end
 
       -- Write to all known chat buffers for this adapter, or the specific one
@@ -137,6 +172,10 @@ local function refresh_and_update_stl(provider_name, bufnr)
 
       -- Also update the adapter-keyed cache
       _G.codecompanion_usage_stl["__adapter__" .. provider_name] = text
+
+      if vim.g.codecompanion_debug then
+        vim.notify(string.format("[usage] refresh_and_update_stl: set stl[%d]='%s' stl[__adapter__%s]='%s'", bufnr, text, provider_name, text), vim.log.levels.DEBUG)
+      end
 
       vim.cmd "redrawstatus"
     end)
@@ -149,17 +188,31 @@ end
 ---@return string|nil
 local function provider_for_adapter(adapter_name)
   if not adapter_name then
+    if vim.g.codecompanion_debug then
+      vim.notify("[usage] provider_for_adapter: nil adapter_name", vim.log.levels.DEBUG)
+    end
     return nil
   end
 
   -- Case-insensitive exact match against enabled providers
   local lower = adapter_name:lower()
+  local provider_names = {}
   for name, _ in pairs(state.providers) do
+    table.insert(provider_names, name)
     if name:lower() == lower then
+      if vim.g.codecompanion_debug then
+        vim.notify(string.format("[usage] provider_for_adapter: '%s' matched provider '%s'", adapter_name, name), vim.log.levels.DEBUG)
+      end
       return name
     end
   end
 
+  if vim.g.codecompanion_debug then
+    vim.notify(
+      string.format("[usage] provider_for_adapter: NO match for '%s' among providers: %s", adapter_name, vim.inspect(provider_names)),
+      vim.log.levels.WARN
+    )
+  end
   return nil
 end
 
@@ -167,22 +220,44 @@ end
 ---@param bufnr number
 local function auto_refresh_for_buf(bufnr)
   if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+    if vim.g.codecompanion_debug then
+      vim.notify(string.format("[usage] auto_refresh_for_buf: invalid bufnr=%s", tostring(bufnr)), vim.log.levels.DEBUG)
+    end
     return
   end
 
   local meta = _G.codecompanion_chat_metadata
   if not meta then
+    if vim.g.codecompanion_debug then
+      vim.notify("[usage] auto_refresh_for_buf: _G.codecompanion_chat_metadata is nil", vim.log.levels.DEBUG)
+    end
     return
   end
 
   local chat_meta = meta[bufnr]
   if not chat_meta or not chat_meta.adapter then
+    if vim.g.codecompanion_debug then
+      vim.notify(
+        string.format("[usage] auto_refresh_for_buf: no chat_meta or adapter for bufnr=%d (chat_meta=%s)", bufnr, tostring(chat_meta)),
+        vim.log.levels.DEBUG
+      )
+    end
     return
   end
 
   local adapter_name = chat_meta.adapter.name
   if not adapter_name then
+    if vim.g.codecompanion_debug then
+      vim.notify(string.format("[usage] auto_refresh_for_buf: adapter.name is nil for bufnr=%d", bufnr), vim.log.levels.DEBUG)
+    end
     return
+  end
+
+  if vim.g.codecompanion_debug then
+    vim.notify(
+      string.format("[usage] auto_refresh_for_buf bufnr=%d adapter_name=%s", bufnr, adapter_name),
+      vim.log.levels.DEBUG
+    )
   end
 
   local provider_name = provider_for_adapter(adapter_name)
@@ -190,7 +265,20 @@ local function auto_refresh_for_buf(bufnr)
   if not provider_name then
     -- No mapping for this adapter; clear any stale statusline
     _G.codecompanion_usage_stl[bufnr] = nil
+    if vim.g.codecompanion_debug then
+      vim.notify(
+        string.format("[usage] auto_refresh_for_buf: no provider for adapter '%s', cleared stl", adapter_name),
+        vim.log.levels.WARN
+      )
+    end
     return
+  end
+
+  if vim.g.codecompanion_debug then
+    vim.notify(
+      string.format("[usage] auto_refresh_for_buf: matched provider '%s', triggering refresh", provider_name),
+      vim.log.levels.DEBUG
+    )
   end
 
   -- Debounce: cancel any pending timer for this bufnr
@@ -338,6 +426,20 @@ end
 
 function Extension.setup(opts)
   state.opts = util.deep_extend(defaults, opts or {})
+  if vim.g.codecompanion_debug then
+    local provider_names = {}
+    for name, p_opts in pairs(state.opts.providers or {}) do
+      table.insert(provider_names, string.format("%s(enabled=%s)", name, tostring(p_opts.enabled ~= false)))
+    end
+    vim.notify(
+      string.format("[usage] Extension.setup: merged config providers=%s auto_refresh=%s refresh_interval=%d",
+        table.concat(provider_names, ", "),
+        tostring(state.opts.auto_refresh),
+        state.opts.refresh_interval_sec
+      ),
+      vim.log.levels.DEBUG
+    )
+  end
   setup_providers()
   create_commands()
   setup_auto_refresh()
