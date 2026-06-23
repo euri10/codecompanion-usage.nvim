@@ -1,4 +1,4 @@
-local util = require("codecompanion._extensions.usage.util")
+local util = require "codecompanion._extensions.usage.util"
 
 local M = {}
 
@@ -33,31 +33,42 @@ local defaults = {
 -- ============================================================================
 
 local function claude_home()
-  return vim.env.CLAUDE_CODE_HOME ~= "" and vim.env.CLAUDE_CODE_HOME
-    or vim.fn.expand("~/.claude")
+  return vim.env.CLAUDE_CODE_HOME ~= "" and vim.env.CLAUDE_CODE_HOME or vim.fn.expand "~/.claude"
 end
 
 local function credentials_path(opts)
-  return (opts.credentials_path and opts.credentials_path ~= "" and util.expand(opts.credentials_path))
-    or claude_home() .. "/.credentials.json"
+  return (opts.credentials_path and opts.credentials_path ~= "" and util.expand(opts.credentials_path)) or claude_home() .. "/.credentials.json"
 end
 
 --- Parse ISO‑8601 timestamp → epoch seconds.
 local function parse_iso8601(s)
-  if not s or s == "" then return nil end
-  local year, month, day, hour, min, sec =
-    s:match("^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)")
-  if not year then return nil end
+  if not s or s == "" then
+    return nil
+  end
+  local year, month, day, hour, min, sec = s:match "^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)"
+  if not year then
+    return nil
+  end
   year, month, day = tonumber(year), tonumber(month), tonumber(day)
   hour, min, sec = tonumber(hour), tonumber(min), tonumber(sec)
 
   local tz = 0
-  local sign, th, tm = s:match("([%+%-])(%d+):(%d+)$")
-  if sign then tz = (sign == "-" and -1 or 1) * (tonumber(th) * 3600 + tonumber(tm) * 60) end
+  local sign, th, tm = s:match "([%+%-])(%d+):(%d+)$"
+  if sign then
+    tz = (sign == "-" and -1 or 1) * (tonumber(th) * 3600 + tonumber(tm) * 60)
+  end
 
-  local t = os.time({ year = year, month = month, day = day, hour = hour, min = min, sec = sec })
-  if not t then return nil end
-  return t - os.difftime(os.time(), os.time(os.date("!*t"))) - tz
+  local t = os.time { year = year, month = month, day = day, hour = hour, min = min, sec = sec }
+  if not t then
+    return nil
+  end
+
+  -- os.time interprets the table as *local* time.  To convert to UTC:
+  --   local_offset = current local time - current UTC time (seconds)
+  --   The string represents a time in zone `tz` (positive = east of UTC).
+  --   UTC epoch = t - (tz - local_offset) = t - tz + local_offset
+  local local_offset = os.difftime(os.time(), os.time(os.date "!*t"))
+  return t - tz + local_offset
 end
 
 -- ============================================================================
@@ -93,7 +104,8 @@ local function load_credentials(opts)
     scopes = oauth.scopes or {},
     subscription_type = oauth.subscriptionType,
     rate_limit_tier = oauth.rateLimitTier,
-  }, nil
+  },
+    nil
 end
 
 local function is_token_expired(creds)
@@ -109,19 +121,25 @@ local function refresh_token_async(creds, opts, cb)
     return cb(nil, "No refresh token available. Run `claude login` first.")
   end
 
-  local body = "grant_type=refresh_token"
-    .. "&refresh_token=" .. creds.refresh_token
-    .. "&client_id=" .. opts.client_id
+  local body = "grant_type=refresh_token" .. "&refresh_token=" .. creds.refresh_token .. "&client_id=" .. opts.client_id
 
   util.system_json({
-    "curl", "-sS", "--fail-with-body",
-    "--max-time", tostring(math.floor((opts.timeout_ms or 10000) / 1000)),
-    "-X", "POST",
+    "curl",
+    "-sS",
+    "--fail-with-body",
+    "--max-time",
+    tostring(math.floor((opts.timeout_ms or 10000) / 1000)),
+    "-X",
+    "POST",
     opts.token_endpoint,
-    "-H", "Content-Type: application/x-www-form-urlencoded",
-    "-H", "Accept: application/json",
-    "-H", "User-Agent: " .. opts.user_agent,
-    "-d", body,
+    "-H",
+    "Content-Type: application/x-www-form-urlencoded",
+    "-H",
+    "Accept: application/json",
+    "-H",
+    "User-Agent: " .. opts.user_agent,
+    "-d",
+    body,
   }, function(data, err)
     if err then
       return cb(nil, "Token refresh failed: " .. util.redact(err))
@@ -131,21 +149,31 @@ local function refresh_token_async(creds, opts, cb)
     end
 
     local new_creds = vim.deepcopy(creds)
-    if data.access_token then new_creds.access_token = data.access_token end
-    if data.refresh_token then new_creds.refresh_token = data.refresh_token end
+    if data.access_token then
+      new_creds.access_token = data.access_token
+    end
+    if data.refresh_token then
+      new_creds.refresh_token = data.refresh_token
+    end
     if data.expires_in then
       new_creds.expires_at = os.time() * 1000 + tonumber(data.expires_in) * 1000
     end
 
     -- Persist
     if creds.raw_data and (data.access_token or data.refresh_token) then
-      if data.access_token then creds.raw_data.claudeAiOauth.accessToken = data.access_token end
-      if data.refresh_token then creds.raw_data.claudeAiOauth.refreshToken = data.refresh_token end
+      if data.access_token then
+        creds.raw_data.claudeAiOauth.accessToken = data.access_token
+      end
+      if data.refresh_token then
+        creds.raw_data.claudeAiOauth.refreshToken = data.refresh_token
+      end
       if data.expires_in then
         creds.raw_data.claudeAiOauth.expiresAt = new_creds.expires_at
       end
       local encoded = util.json_encode(creds.raw_data)
-      if encoded then util.write_file_secure(creds.path, encoded) end
+      if encoded then
+        util.write_file_secure(creds.path, encoded)
+      end
     end
 
     cb(new_creds, nil)
@@ -158,14 +186,22 @@ end
 
 local function fetch_oauth_usage_async(access_token, opts, cb)
   util.system_json({
-    "curl", "-sS", "--fail-with-body",
-    "--max-time", tostring(math.floor((opts.timeout_ms or 10000) / 1000)),
+    "curl",
+    "-sS",
+    "--fail-with-body",
+    "--max-time",
+    tostring(math.floor((opts.timeout_ms or 10000) / 1000)),
     opts.usage_endpoint,
-    "-H", "Authorization: Bearer " .. access_token,
-    "-H", "Accept: application/json",
-    "-H", "Content-Type: application/json",
-    "-H", "anthropic-beta: " .. opts.beta_header,
-    "-H", "User-Agent: " .. opts.user_agent,
+    "-H",
+    "Authorization: Bearer " .. access_token,
+    "-H",
+    "Accept: application/json",
+    "-H",
+    "Content-Type: application/json",
+    "-H",
+    "anthropic-beta: " .. opts.beta_header,
+    "-H",
+    "User-Agent: " .. opts.user_agent,
   }, function(data, err)
     if err then
       cb(nil, "Claude OAuth usage request failed: " .. util.redact(err))
@@ -180,11 +216,15 @@ end
 -- ============================================================================
 
 local function normalize_window(w, label, seconds)
-  if not w or w.utilization == nil then return nil end
+  if not w or w.utilization == nil then
+    return nil
+  end
   local used = tonumber(w.utilization)
-  if not used then return nil end
+  if not used then
+    return nil
+  end
   return {
-    provider = "claude",
+    provider = "claude_code",
     label = label,
     used_percent = used,
     remaining_percent = math.max(0, 100 - used),
@@ -198,7 +238,9 @@ local function normalize_oauth_usage(data, creds)
 
   local function add(w, label, sec)
     local n = normalize_window(w, label, sec)
-    if n then table.insert(windows, n) end
+    if n then
+      table.insert(windows, n)
+    end
   end
 
   add(data.five_hour, "5h", 5 * 3600)
@@ -218,7 +260,7 @@ local function normalize_oauth_usage(data, creds)
     if used and limit and limit > 0 then
       local pct = (used / limit) * 100
       table.insert(windows, {
-        provider = "claude",
+        provider = "claude_code",
         label = "spend (monthly)",
         used_percent = pct,
         remaining_percent = math.max(0, 100 - pct),
@@ -231,7 +273,9 @@ local function normalize_oauth_usage(data, creds)
   local plan_type = nil
   if creds then
     local parts = {}
-    if creds.subscription_type then table.insert(parts, creds.subscription_type) end
+    if creds.subscription_type then
+      table.insert(parts, creds.subscription_type)
+    end
     if creds.rate_limit_tier and creds.rate_limit_tier ~= "default_claude_ai" then
       table.insert(parts, creds.rate_limit_tier)
     end
@@ -239,7 +283,7 @@ local function normalize_oauth_usage(data, creds)
   end
 
   return {
-    provider = "claude",
+    provider = "claude_code",
     provider_label = "Claude",
     plan_type = plan_type,
     windows = windows,
@@ -260,57 +304,57 @@ local function fetch_cli_simple_async(opts, cb)
     end
 
     local timeout = (opts.cli_timeout_sec or 15) * 1000
-    vim.system(
-      { binary, "-p", "/usage", "--output-format", "json" },
-      { text = true, timeout = timeout },
-      function(res)
-        if res.code ~= 0 then
-          return cb(nil, "Claude CLI failed: " .. util.redact(res.stderr or res.stdout or ""))
-        end
+    vim.system({ binary, "-p", "/usage", "--output-format", "json" }, { text = true, timeout = timeout }, function(res)
+      if res.code ~= 0 then
+        return cb(nil, "Claude CLI failed: " .. util.redact(res.stderr or res.stdout or ""))
+      end
 
-        local data = util.json_decode(res.stdout or "")
-        if not data then
-          -- Try to find a JSON line
-          for line in (res.stdout or ""):gmatch("[^\r\n]+") do
-            local d = util.json_decode(line)
-            if d then data = d end
+      local data = util.json_decode(res.stdout or "")
+      if not data then
+        -- Try to find a JSON line
+        for line in (res.stdout or ""):gmatch "[^\r\n]+" do
+          local d = util.json_decode(line)
+          if d then
+            data = d
           end
         end
-
-        if not data then
-          return cb(nil, "Could not parse Claude CLI output")
-        end
-
-        cb(data, nil)
       end
-    )
+
+      if not data then
+        return cb(nil, "Could not parse Claude CLI output")
+      end
+
+      cb(data, nil)
+    end)
   end)
 end
 
 local function normalize_cli_simple(data)
-  if not data then return nil end
+  if not data then
+    return nil
+  end
 
   local text = data.result or ""
   local windows = {}
 
   -- Detect session-limit error ("0% left")
-  if text:match("session limit") then
+  if text:match "session limit" then
     table.insert(windows, {
-      provider = "claude",
+      provider = "claude_code",
       label = "session (5h)",
       remaining_percent = 0,
       used_percent = 100,
       reset_at = nil,
     })
     -- Try to extract reset time from the message
-    local reset = text:match("resets%s+(.+)")
+    local reset = text:match "resets%s+(.+)"
     if reset and windows[1] then
       windows[1]._reset_text = reset
     end
   end
 
   return {
-    provider = "claude",
+    provider = "claude_code",
     provider_label = "Claude",
     windows = windows,
     _cli_result = text,
@@ -370,7 +414,9 @@ function M.refresh(cb)
 
   if is_token_expired(creds) and opts.allow_token_refresh then
     refresh_token_async(creds, opts, function(new_creds, _)
-      if new_creds then creds = new_creds end
+      if new_creds then
+        creds = new_creds
+      end
       call_oauth()
     end)
   else

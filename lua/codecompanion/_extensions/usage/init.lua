@@ -306,6 +306,7 @@ local function create_commands()
   pcall(vim.api.nvim_del_user_command, state.opts.command)
   pcall(vim.api.nvim_del_user_command, state.opts.command .. "Codex")
   pcall(vim.api.nvim_del_user_command, state.opts.command .. "Claude")
+  pcall(vim.api.nvim_del_user_command, state.opts.command .. "ClaudeCode")
 
   vim.api.nvim_create_user_command(state.opts.command, function(args)
     if args.args and args.args ~= "" then
@@ -328,6 +329,11 @@ local function create_commands()
   vim.api.nvim_create_user_command(state.opts.command .. "Claude", function()
     insert_provider "claude"
   end, { desc = "Fetch and insert Claude usage" })
+
+  -- Alias for users who expect the adapter name as the command
+  vim.api.nvim_create_user_command(state.opts.command .. "ClaudeCode", function()
+    insert_provider "claude"
+  end, { desc = "Fetch and insert Claude usage (alias)" })
 end
 
 function Extension.setup(opts)

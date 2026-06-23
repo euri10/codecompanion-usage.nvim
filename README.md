@@ -4,7 +4,7 @@ A Neovim extension for [codecompanion.nvim](https://github.com/olimorris/codecom
 
 Shows usage statistics for:
 - **Codex** (OpenAI Codex CLI) – reads auth from `~/.codex/auth.json` and queries the Codex usage API
-- **Claude** (Anthropic Claude Code) – reads OAuth credentials from `~/.claude/.credentials.json` and queries the Anthropic OAuth usage API, with optional CLI fallback
+- **Claude** (Anthropic Claude Code) – reads OAuth credentials from `~/.claude/.credentials.json` and queries the Anthropic OAuth usage API, with optional CLI fallback. The provider key is `claude_code` (matching the codecompanion.nvim adapter name).
 
 Built following the architecture of [CodexBar](https://github.com/steipete/CodexBar).
 
@@ -24,7 +24,7 @@ Using **lazy.nvim**:
           -- optional overrides
           providers = {
             codex = { enabled = true },
-            claude = { enabled = true },
+            claude_code = { enabled = true },
           },
         })
       end,
@@ -52,7 +52,7 @@ Two data sources, tried in order:
 ```lua
 require("codecompanion._extensions.usage").setup({
   command = "CodeCompanionUsage",   -- :CodeCompanionUsage to refresh manually
-  default_provider = "codex",       -- or "claude"
+  default_provider = "codex",       -- or "claude_code"
   auto_refresh = true,
   auto_refresh_debounce_ms = 2000,
   refresh_interval_sec = 300,       -- periodic refresh (0 = disabled)
@@ -64,7 +64,7 @@ require("codecompanion._extensions.usage").setup({
       -- auth_path = "~/.codex/auth.json",
       -- timeout_ms = 10000,
     },
-    claude = {
+    claude_code = {
       enabled = true,
       -- credentials_path = "~/.claude/.credentials.json",
       -- usage_endpoint = "https://api.anthropic.com/api/oauth/usage",
@@ -76,6 +76,8 @@ require("codecompanion._extensions.usage").setup({
   },
 })
 ```
+
+> **Backward compatibility:** The legacy provider key `claude` is automatically mapped to `claude_code`. Existing configurations using `claude = { enabled = true }` will continue to work.
 
 ## Statusline
 
