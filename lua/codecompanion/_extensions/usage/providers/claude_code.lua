@@ -43,8 +43,11 @@ local function parse_iso8601(s)
   if not year then
     return nil
   end
-  year, month, day = tonumber(year), tonumber(month), tonumber(day)
-  hour, min, sec = tonumber(hour), tonumber(min), tonumber(sec)
+  year, month, day = math.tointeger(year), math.tointeger(month), math.tointeger(day)
+  hour, min, sec = math.tointeger(hour), math.tointeger(min), math.tointeger(sec)
+  if not (year and month and day and hour and min and sec) then
+    return nil
+  end
 
   local tz = 0
   local sign, th, tm = s:match "([%+%-])(%d+):(%d+)$"
@@ -61,7 +64,7 @@ local function parse_iso8601(s)
   --   local_offset = current local time - current UTC time (seconds)
   --   The string represents a time in zone `tz` (positive = east of UTC).
   --   UTC epoch = t - (tz - local_offset) = t - tz + local_offset
-  local local_offset = os.difftime(os.time(), os.time(os.date "!*t"))
+  local local_offset = os.difftime(os.time(), os.time(os.date("!*t")))
   return t - tz + local_offset
 end
 
@@ -76,9 +79,9 @@ local function load_credentials(opts)
     return nil, "Could not read credentials from " .. path .. ": " .. tostring(err)
   end
 
-  local data, err = util.json_decode(raw)
+  local data, json_err = util.json_decode(raw)
   if not data then
-    return nil, "Could not parse " .. path .. ": " .. tostring(err)
+    return nil, "Could not parse " .. path .. ": " .. tostring(json_err)
   end
 
   local oauth = data.claudeAiOauth
