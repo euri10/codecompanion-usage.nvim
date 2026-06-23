@@ -4,7 +4,7 @@ A Neovim extension for [codecompanion.nvim](https://github.com/olimorris/codecom
 
 Shows usage statistics for:
 - **Codex** (OpenAI Codex CLI) – reads auth from `~/.codex/auth.json` and queries the Codex usage API
-- **Claude** (Anthropic Claude Code) – reads OAuth credentials from `~/.claude/.credentials.json` and queries the Anthropic OAuth usage API. The canonical provider key is `claude_code`; the legacy `claude` alias is still accepted.
+- **Claude Code** (Anthropic Claude Code) – reads OAuth credentials from `~/.claude/.credentials.json` and queries the Anthropic OAuth usage API.
 
 Built following the architecture of [CodexBar](https://github.com/steipete/CodexBar).
 
@@ -68,8 +68,6 @@ require("codecompanion._extensions.usage").setup({
   },
 })
 ```
-
-> **Backward compatibility:** The legacy provider key `claude` is normalized to `claude_code`. Existing configurations using `claude = { enabled = true }` will continue to work.
 
 ## Statusline
 

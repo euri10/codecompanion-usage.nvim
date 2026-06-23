@@ -36,18 +36,13 @@ local function canonical_provider_name(name)
     return nil
   end
 
-  local normalized = tostring(name):lower():gsub("%s+", "_"):gsub("%-+", "_")
-  if normalized == "claude" then
-    return "claude_code"
-  end
-
-  return normalized
+  return tostring(name):lower():gsub("%s+", "_"):gsub("%-+", "_")
 end
 
 local function display_provider_name(name)
   local canonical = canonical_provider_name(name)
   if canonical == "claude_code" then
-    return "Claude"
+    return "Claude Code"
   end
   if canonical == "codex" then
     return "Codex"
@@ -234,7 +229,7 @@ local function provider_for_adapter(adapter_name)
   end
 
   -- Normalize adapter name to match provider keys:
-  -- "Claude Code" → "claude_code", "claude_code" → "claude_code"
+  -- "Claude Code" → "claude_code"
   local normalized = canonical_provider_name(adapter_name)
 
   local provider_names = {}
