@@ -82,6 +82,25 @@ require("codecompanion._extensions.usage").setup({
 })
 ```
 
+### Minimal Configuration
+
+Here's a minimal setup using multiple providers with a bar statusline:
+
+```lua
+require("codecompanion._extensions.usage").setup({
+  providers = {
+    codex = { enabled = true },
+    claude_code = { enabled = true },
+    copilot_acp = { enabled = true },
+  },
+  auto_refresh = true,
+  refresh_interval_sec = 300,
+  auto_refresh_debounce_ms = 2000,
+  statusline_style = "bar",
+  statusline_bar_width = 12,
+})
+```
+
 ## Statusline
 
 The extension exposes a global table `_G.codecompanion_usage_stl` keyed by buffer number. You can use it in your statusline:
