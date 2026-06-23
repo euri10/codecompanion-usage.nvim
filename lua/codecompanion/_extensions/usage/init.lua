@@ -233,6 +233,13 @@ local function refresh_and_update_stl(provider_name, bufnr)
   end)
 end
 
+-- Aliases from normalized adapter display-names to provider keys.
+-- Needed when the adapter's formatted_name differs from the provider key
+-- (e.g. "Copilot" / "copilot_acp" for the ACP-based Copilot adapter).
+local ADAPTER_ALIASES = {
+  copilot = "copilot_acp",
+}
+
 ---Given a codecompanion adapter name, return the matching provider name if it exists.
 ---The adapter name is normalized (spaces → underscores, lowercased) to match
 ---provider keys (e.g. "Claude Code" ↔ "claude_code").
@@ -247,7 +254,7 @@ local function provider_for_adapter(adapter_name)
   end
 
   -- Normalize adapter name to match provider keys:
-  -- "Claude Code" → "claude_code"
+  -- "Claude Code" → "claude_code", "Copilot" → "copilot"
   local normalized = canonical_provider_name(adapter_name)
 
   local provider_names = {}
@@ -259,6 +266,16 @@ local function provider_for_adapter(adapter_name)
       end
       return name
     end
+  end
+
+  -- Fall back to alias table for adapters whose display name differs from the
+  -- provider key (e.g. "Copilot" → "copilot_acp").
+  local aliased = ADAPTER_ALIASES[normalized]
+  if aliased and state.providers[aliased] then
+    if vim.g.codecompanion_debug then
+      vim.notify(string.format("[usage] provider_for_adapter: '%s' aliased to provider '%s'", adapter_name, aliased), vim.log.levels.DEBUG)
+    end
+    return aliased
   end
 
   if vim.g.codecompanion_debug then
