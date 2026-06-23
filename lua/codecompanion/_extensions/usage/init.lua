@@ -19,6 +19,7 @@ local defaults = {
   providers = {
     codex = { enabled = true },
     claude_code = { enabled = true },
+    copilot_acp = { enabled = true },
   },
 }
 
@@ -50,6 +51,9 @@ local function display_provider_name(name)
   end
   if canonical == "codex" then
     return "Codex"
+  end
+  if canonical == "copilot_acp" then
+    return "Copilot"
   end
   if not canonical then
     return "usage"
