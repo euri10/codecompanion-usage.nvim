@@ -12,6 +12,10 @@ local defaults = {
   auto_refresh_debounce_ms = 2000,
   --- Refresh interval in seconds (0 = no periodic refresh).
   refresh_interval_sec = 300,
+  --- Statusline style: "text" (default) or "bar".
+  statusline_style = "text",
+  --- Width of the progress bar when statusline_style = "bar".
+  statusline_bar_width = 12,
   providers = {
     codex = { enabled = true },
     claude_code = { enabled = true },
@@ -142,6 +146,16 @@ local function refresh_provider(name, cb)
   end)
 end
 
+local function render_snapshot(snapshot)
+  if state.opts.statusline_style == "bar" then
+    return render.bar(snapshot, {
+      width = state.opts.statusline_bar_width,
+    })
+  end
+
+  return render.compact(snapshot)
+end
+
 local function refresh_all(cb)
   local names = enabled_provider_names()
   local remaining = #names
@@ -184,7 +198,7 @@ local function refresh_and_update_stl(provider_name, bufnr)
           vim.notify(string.format("[usage] refresh_and_update_stl: '%s' error: %s", provider_name, tostring(err)), vim.log.levels.ERROR)
         end
       elseif snapshot then
-        text = render.compact(snapshot)
+        text = render_snapshot(snapshot)
         if vim.g.codecompanion_debug then
           vim.notify(
             string.format("[usage] refresh_and_update_stl: '%s' snapshot=%s compact=%s", provider_name, vim.inspect(snapshot), text),
@@ -442,7 +456,7 @@ local function statusline_for_provider(provider_name)
   if not snapshot then
     return display_provider_name(provider_name) .. " > n/a"
   end
-  return render.compact(snapshot)
+  return render_snapshot(snapshot)
 end
 
 Extension.exports = {

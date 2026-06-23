@@ -50,6 +50,8 @@ require("codecompanion._extensions.usage").setup({
   auto_refresh = true,
   auto_refresh_debounce_ms = 2000,
   refresh_interval_sec = 300,       -- periodic refresh (0 = disabled)
+  statusline_style = "bar",         -- "text" (default) or "bar"
+  statusline_bar_width = 12,        -- used when statusline_style = "bar"
 
   providers = {
     codex = {
@@ -99,6 +101,8 @@ The compact render is provider-agnostic and uses the same shape for Codex and Cl
 ```text
 Codex > 5h: 89% (4.4h) W: 18% (1.8d)
 ```
+
+If you set `statusline_style = "bar"`, the extension emits a statusline-safe progress bar instead of the percentage text. The bar uses Neovim highlight sequences, so it works in a statusline consumer that preserves `%#...#` syntax. If your consumer strips statusline escapes, you will still see the block characters but not the colors.
 
 ## Requirements
 
