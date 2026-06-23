@@ -36,7 +36,8 @@ end
 
 --- Parse ISO‑8601 timestamp → epoch seconds.
 local function parse_iso8601(s)
-  if not s or s == "" then
+  -- vim.json.decode may return vim.NIL (userdata) for null values
+  if s == nil or s == "" or type(s) ~= "string" then
     return nil
   end
   local year, month, day, hour, min, sec = s:match "^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)"
