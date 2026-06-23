@@ -43,8 +43,8 @@ local function parse_iso8601(s)
   if not year then
     return nil
   end
-  year, month, day = math.tointeger(year), math.tointeger(month), math.tointeger(day)
-  hour, min, sec = math.tointeger(hour), math.tointeger(min), math.tointeger(sec)
+  year, month, day = tonumber(year), tonumber(month), tonumber(day)
+  hour, min, sec = tonumber(hour), tonumber(min), tonumber(sec)
   if not (year and month and day and hour and min and sec) then
     return nil
   end
@@ -64,7 +64,12 @@ local function parse_iso8601(s)
   --   local_offset = current local time - current UTC time (seconds)
   --   The string represents a time in zone `tz` (positive = east of UTC).
   --   UTC epoch = t - (tz - local_offset) = t - tz + local_offset
-  local local_offset = os.difftime(os.time(), os.time(os.date("!*t")))
+  local tz_string = tostring(os.date("%z"))
+  local tz_sign, tz_hour, tz_min = tz_string:match "^([%+%-])(%d%d)(%d%d)$"
+  local local_offset = 0
+  if tz_sign then
+    local_offset = (tz_sign == "-" and -1 or 1) * ((tonumber(tz_hour) or 0) * 3600 + (tonumber(tz_min) or 0) * 60)
+  end
   return t - tz + local_offset
 end
 
