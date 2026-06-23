@@ -1,28 +1,11 @@
-local util = require("codecompanion._extensions.usage.util")
-local render = require("codecompanion._extensions.usage.render")
+local util = require "codecompanion._extensions.usage.util"
+local render = require "codecompanion._extensions.usage.render"
 
 local Extension = {}
 
 local defaults = {
-  notify = true,
   command = "CodeCompanionUsage",
-  add_chat_keymap = true,
-  chat_keymap = "gu",
   default_provider = "codex",
-  --- Map codecompanion adapter names to usage provider names.
-  --- Keys can be internal adapter names (e.g. "claude_code", "codex") or
-  --- formatted names (e.g. "Claude Code", "Codex"). Matching is
-  --- case-insensitive.
-  --- When the active chat uses one of these adapters, the matching provider
-  --- is auto-refreshed and its compact statusline string is written to
-  --- `_G.codecompanion_usage_stl[bufnr]`.
-  adapter_map = {
-    -- internal name          formatted name (either works)
-    codex = "codex",          -- "Codex"
-    claude_code = "claude",   -- "Claude Code"
-    ["Claude Code"] = "claude",
-    Codex = "codex",
-  },
   --- If true, auto-refresh usage when entering a codecompanion chat buffer
   --- and whenever the ACP config (model/mode/thought) changes.
   auto_refresh = true,
@@ -140,8 +123,7 @@ local function refresh_and_update_stl(provider_name, bufnr)
     vim.schedule(function()
       local text
       if err then
-        text = (state.opts.providers[provider_name] and state.opts.providers[provider_name].label or provider_name)
-          .. " err"
+        text = (state.opts.providers[provider_name] and state.opts.providers[provider_name].label or provider_name) .. " err"
       elseif snapshot then
         text = render.compact(snapshot)
       else
@@ -156,39 +138,25 @@ local function refresh_and_update_stl(provider_name, bufnr)
       -- Also update the adapter-keyed cache
       _G.codecompanion_usage_stl["__adapter__" .. provider_name] = text
 
-      vim.cmd("redrawstatus")
+      vim.cmd "redrawstatus"
     end)
   end)
 end
 
----Given a codecompanion adapter name (internal or formatted), return the provider name.
+---Given a codecompanion adapter name, return the matching provider name if it exists.
+---The adapter name must match a provider name directly (case-insensitive).
 ---@param adapter_name string
 ---@return string|nil
 local function provider_for_adapter(adapter_name)
   if not adapter_name then
     return nil
   end
-  local map = state.opts.adapter_map or {}
 
-  -- 1. Exact match
-  local provider = map[adapter_name]
-  if provider then
-    return provider
-  end
-
-  -- 2. Case-insensitive match
+  -- Case-insensitive exact match against enabled providers
   local lower = adapter_name:lower()
-  for key, val in pairs(map) do
-    if key:lower() == lower then
-      return val
-    end
-  end
-
-  -- 3. Try stripping spaces and special chars for fuzzy match
-  local stripped = lower:gsub("[^%w]", "")
-  for key, val in pairs(map) do
-    if key:lower():gsub("[^%w]", "") == stripped then
-      return val
+  for name, _ in pairs(state.providers) do
+    if name:lower() == lower then
+      return name
     end
   end
 
@@ -315,7 +283,6 @@ local function insert_provider(name)
   refresh_provider(name, function(snapshot, err)
     vim.schedule(function()
       if err then
-        util.notify(err, vim.log.levels.ERROR, state.opts.notify)
         return
       end
       util.insert_text(render.provider(snapshot))
@@ -355,44 +322,18 @@ local function create_commands()
   })
 
   vim.api.nvim_create_user_command(state.opts.command .. "Codex", function()
-    insert_provider("codex")
+    insert_provider "codex"
   end, { desc = "Fetch and insert Codex usage" })
 
   vim.api.nvim_create_user_command(state.opts.command .. "Claude", function()
-    insert_provider("claude")
+    insert_provider "claude"
   end, { desc = "Fetch and insert Claude usage" })
-end
-
-local function add_chat_keymap()
-  if state.opts.add_chat_keymap == false then
-    return
-  end
-
-  local ok, config = pcall(require, "codecompanion.config")
-  if not ok or not config.interactions or not config.interactions.chat then
-    return
-  end
-
-  config.interactions.chat.keymaps = config.interactions.chat.keymaps or {}
-  config.interactions.chat.keymaps.usage = {
-    modes = { n = state.opts.chat_keymap },
-    description = "Insert AI usage",
-    callback = function(chat)
-      refresh_all(function(snapshots)
-        vim.schedule(function()
-          local bufnr = chat and chat.bufnr
-          util.insert_text(render.all(snapshots), type(bufnr) == "number" and bufnr or nil)
-        end)
-      end)
-    end,
-  }
 end
 
 function Extension.setup(opts)
   state.opts = util.deep_extend(defaults, opts or {})
   setup_providers()
   create_commands()
-  add_chat_keymap()
   setup_auto_refresh()
   setup_periodic_refresh()
 end
@@ -442,7 +383,7 @@ Extension.exports = {
   ---@return string
   statusline_for = statusline_for_provider,
 
-  ---Given a codecompanion adapter name, return the mapped provider name.
+  ---Given a codecompanion adapter name, return the matching provider name if it exists.
   ---@param adapter_name string
   ---@return string|nil
   provider_for = provider_for_adapter,

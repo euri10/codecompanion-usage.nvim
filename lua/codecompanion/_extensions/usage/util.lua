@@ -4,13 +4,6 @@ function M.deep_extend(...)
   return vim.tbl_deep_extend("force", ...)
 end
 
-function M.notify(msg, level, enabled)
-  if enabled == false then
-    return
-  end
-  vim.notify(msg, level or vim.log.levels.INFO, { title = "CodeCompanion Usage" })
-end
-
 function M.redact(s)
   if not s then
     return s
