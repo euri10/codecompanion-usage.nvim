@@ -261,6 +261,14 @@ local function provider_for_adapter(adapter_name)
     end
   end
 
+  -- Special case: "Copilot" (normalized to "copilot") should map to "copilot_acp"
+  if normalized == "copilot" and state.providers["copilot_acp"] then
+    if vim.g.codecompanion_debug then
+      vim.notify(string.format("[usage] provider_for_adapter: '%s' matched provider 'copilot_acp'", adapter_name), vim.log.levels.DEBUG)
+    end
+    return "copilot_acp"
+  end
+
   if vim.g.codecompanion_debug then
     vim.notify(
       string.format("[usage] provider_for_adapter: NO match for '%s' (normalized='%s') among providers: %s", adapter_name, normalized, vim.inspect(provider_names)),
