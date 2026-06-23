@@ -36,11 +36,6 @@ local state = {
 -- Global table for statusline consumption: _G.codecompanion_usage_stl[bufnr] = "Codex > 5h: 89% (4.4h) W: 18% (1.8d)"
 _G.codecompanion_usage_stl = _G.codecompanion_usage_stl or {}
 
--- Map adapter names to provider names (handles cases where they don't match by normalization)
-local adapter_to_provider = {
-  copilot = "copilot_acp",
-}
-
 local function canonical_provider_name(name)
   if not name then
     return nil
@@ -264,14 +259,6 @@ local function provider_for_adapter(adapter_name)
       end
       return name
     end
-  end
-
-  -- Check explicit adapter→provider mappings
-  if adapter_to_provider[normalized] and state.providers[adapter_to_provider[normalized]] then
-    if vim.g.codecompanion_debug then
-      vim.notify(string.format("[usage] provider_for_adapter: '%s' mapped to provider '%s'", adapter_name, adapter_to_provider[normalized]), vim.log.levels.DEBUG)
-    end
-    return adapter_to_provider[normalized]
   end
 
   if vim.g.codecompanion_debug then
