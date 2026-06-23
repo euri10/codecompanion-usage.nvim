@@ -183,7 +183,8 @@ local function refresh_and_update_stl(provider_name, bufnr)
 end
 
 ---Given a codecompanion adapter name, return the matching provider name if it exists.
----The adapter name must match a provider name directly (case-insensitive).
+---The adapter name is normalized (spaces → underscores, lowercased) to match
+---provider keys (e.g. "Claude Code" ↔ "claude_code").
 ---@param adapter_name string
 ---@return string|nil
 local function provider_for_adapter(adapter_name)
@@ -194,12 +195,14 @@ local function provider_for_adapter(adapter_name)
     return nil
   end
 
-  -- Case-insensitive exact match against enabled providers
-  local lower = adapter_name:lower()
+  -- Normalize adapter name to match provider keys:
+  -- "Claude Code" → "claude_code", "claude_code" → "claude_code"
+  local normalized = adapter_name:lower():gsub("%s+", "_"):gsub("_+", "_")
+
   local provider_names = {}
   for name, _ in pairs(state.providers) do
     table.insert(provider_names, name)
-    if name:lower() == lower then
+    if name:lower() == normalized then
       if vim.g.codecompanion_debug then
         vim.notify(string.format("[usage] provider_for_adapter: '%s' matched provider '%s'", adapter_name, name), vim.log.levels.DEBUG)
       end
@@ -209,7 +212,7 @@ local function provider_for_adapter(adapter_name)
 
   if vim.g.codecompanion_debug then
     vim.notify(
-      string.format("[usage] provider_for_adapter: NO match for '%s' among providers: %s", adapter_name, vim.inspect(provider_names)),
+      string.format("[usage] provider_for_adapter: NO match for '%s' (normalized='%s') among providers: %s", adapter_name, normalized, vim.inspect(provider_names)),
       vim.log.levels.WARN
     )
   end
