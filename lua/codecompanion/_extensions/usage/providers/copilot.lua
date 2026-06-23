@@ -120,7 +120,7 @@ local function normalize_quota(label, quota, seconds)
   end
 
   return {
-    provider = "copilot_acp",
+    provider = "copilot",
     label = label,
     used_percent = used_percent,
     remaining_percent = math.max(0, 100 - used_percent),
@@ -172,7 +172,7 @@ local function normalize(data)
   end
 
   return {
-    provider = "copilot_acp",
+    provider = "copilot",
     provider_label = "Copilot",
     plan_type = plan_type,
     windows = windows,

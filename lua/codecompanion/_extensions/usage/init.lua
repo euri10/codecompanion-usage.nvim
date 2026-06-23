@@ -19,7 +19,7 @@ local defaults = {
   providers = {
     codex = { enabled = true },
     claude_code = { enabled = true },
-    copilot_acp = { enabled = true },
+    copilot = { enabled = true },
   },
 }
 
@@ -52,7 +52,7 @@ local function display_provider_name(name)
   if canonical == "codex" then
     return "Codex"
   end
-  if canonical == "copilot_acp" then
+  if canonical == "copilot" then
     return "Copilot"
   end
   if not canonical then
@@ -259,14 +259,6 @@ local function provider_for_adapter(adapter_name)
       end
       return name
     end
-  end
-
-  -- Special case: "Copilot" (normalized to "copilot") should map to "copilot_acp"
-  if normalized == "copilot" and state.providers["copilot_acp"] then
-    if vim.g.codecompanion_debug then
-      vim.notify(string.format("[usage] provider_for_adapter: '%s' matched provider 'copilot_acp'", adapter_name), vim.log.levels.DEBUG)
-    end
-    return "copilot_acp"
   end
 
   if vim.g.codecompanion_debug then
