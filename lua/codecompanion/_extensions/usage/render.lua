@@ -155,6 +155,11 @@ local function format_window(window)
     return "not implemented"
   end
 
+  -- If the provider supplied a ready-made display string, use it directly.
+  if window.display_text then
+    return window.display_text
+  end
+
   local label = compact_label(window.label)
   local used = window.used_percent
   local remaining = window.remaining_percent
@@ -233,6 +238,11 @@ local function format_window_bar(window, width)
     return "not implemented"
   end
 
+  -- If the provider supplied a ready-made display string, use it directly.
+  if window.display_text then
+    return escape_statusline(window.display_text)
+  end
+
   local label = compact_label(window.label)
   local percent = window_percent(window)
 
@@ -303,6 +313,8 @@ function M.all(snapshots)
 
       if first and first.not_implemented then
         table.insert(parts, "not implemented")
+      elseif first and first.display_text then
+        table.insert(parts, first.display_text)
       else
         if first and first.remaining_percent then
           table.insert(parts, string.format("%s %.0f%% left", first.label, first.remaining_percent))

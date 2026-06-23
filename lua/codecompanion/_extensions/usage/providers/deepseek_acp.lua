@@ -77,24 +77,39 @@ local function normalize(data)
     return nil
   end
 
-  -- If used_amount is nil (neither charged_balance nor used returned), default to 0
-  if not used_amount then
-    used_amount = 0
-  end
+  -- The DeepSeek balance API returns total_balance but does NOT include
+  -- charged_balance / used.  If used_amount is nil we can't compute a
+  -- meaningful percentage; instead show the actual dollar amount.
+  if used_amount then
+    -- We have both total and used: show a proper percentage bar.
+    local used_percent = (used_amount / total_balance) * 100
+    if not used_percent then
+      return nil
+    end
 
-  local used_percent = (used_amount / total_balance) * 100
-  if not used_percent then
-    return nil
-  end
+    table.insert(windows, {
+      provider = "deepseek_acp",
+      label = "balance",
+      used_percent = used_percent,
+      remaining_percent = math.max(0, 100 - used_percent),
+      reset_at = nil,
+      limit_window_seconds = nil,
+    })
+  else
+    -- No usage data returned by the API – just present the raw balance.
+    local currency = balance_info.currency or "USD"
+    local display = string.format("balance: %s %.2f", currency, total_balance)
 
-  table.insert(windows, {
-    provider = "deepseek_acp",
-    label = "balance",
-    used_percent = used_percent,
-    remaining_percent = math.max(0, 100 - used_percent),
-    reset_at = nil,
-    limit_window_seconds = nil,
-  })
+    table.insert(windows, {
+      provider = "deepseek_acp",
+      label = "balance",
+      display_text = display,
+      used_percent = nil,
+      remaining_percent = nil,
+      reset_at = nil,
+      limit_window_seconds = nil,
+    })
+  end
 
   return {
     provider = "deepseek_acp",
