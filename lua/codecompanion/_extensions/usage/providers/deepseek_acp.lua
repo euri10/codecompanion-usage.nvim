@@ -77,6 +77,11 @@ local function normalize(data)
     return nil
   end
 
+  -- If used_amount is nil (neither charged_balance nor used returned), default to 0
+  if not used_amount then
+    used_amount = 0
+  end
+
   local used_percent = (used_amount / total_balance) * 100
   if not used_percent then
     return nil
