@@ -6,7 +6,22 @@ function M.setup(opts)
 end
 
 function M.refresh(cb)
-  cb(nil, "Claude provider is not implemented yet")
+  cb({
+    provider = "claude",
+    provider_label = "Claude",
+    windows = {
+      {
+        provider = "claude",
+        label = "usage",
+        used_percent = nil,
+        remaining_percent = nil,
+        reset_at = nil,
+        not_implemented = true,
+      },
+    },
+    not_implemented = true,
+    raw = {},
+  }, nil)
 end
 
 return M
