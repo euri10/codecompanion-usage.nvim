@@ -20,12 +20,6 @@ local defaults = {
   timeout_ms = 10000,
   --- Try to refresh the access token when expired
   allow_token_refresh = true,
-  --- Fall back to Claude CLI when OAuth is unavailable
-  allow_cli_fallback = true,
-  --- Claude CLI binary
-  cli_binary = "claude",
-  --- CLI timeout in seconds
-  cli_timeout_sec = 15,
 }
 
 -- ============================================================================
@@ -310,76 +304,6 @@ local function normalize_oauth_usage(data, creds)
 end
 
 -- ============================================================================
--- CLI simple fallback (claude -p /usage)
--- ============================================================================
-
-local function fetch_cli_simple_async(opts, cb)
-  local binary = opts.cli_binary or "claude"
-
-  vim.system({ "which", binary }, { text = true }, function(check)
-    if check.code ~= 0 then
-      return cb(nil, "Claude CLI not found. Install from https://code.claude.com/docs/en/overview")
-    end
-
-    local timeout = (opts.cli_timeout_sec or 15) * 1000
-    vim.system({ binary, "-p", "/usage", "--output-format", "json" }, { text = true, timeout = timeout }, function(res)
-      if res.code ~= 0 then
-        return cb(nil, "Claude CLI failed: " .. util.redact(res.stderr or res.stdout or ""))
-      end
-
-      local data = util.json_decode(res.stdout or "")
-      if not data then
-        -- Try to find a JSON line
-        for line in (res.stdout or ""):gmatch "[^\r\n]+" do
-          local d = util.json_decode(line)
-          if d then
-            data = d
-          end
-        end
-      end
-
-      if not data then
-        return cb(nil, "Could not parse Claude CLI output")
-      end
-
-      cb(data, nil)
-    end)
-  end)
-end
-
-local function normalize_cli_simple(data)
-  if not data then
-    return nil
-  end
-
-  local text = data.result or ""
-  local windows = {}
-
-  -- Detect session-limit error ("0% left")
-  if text:match "session limit" then
-    table.insert(windows, {
-      provider = "claude_code",
-      label = "session (5h)",
-      remaining_percent = 0,
-      used_percent = 100,
-      reset_at = nil,
-    })
-    -- Try to extract reset time from the message
-    local reset = text:match "resets%s+(.+)"
-    if reset and windows[1] then
-      windows[1]._reset_text = reset
-    end
-  end
-
-  return {
-    provider = "claude_code",
-    provider_label = "Claude",
-    windows = windows,
-    _cli_result = text,
-  }
-end
-
--- ============================================================================
 -- Setup & Refresh
 -- ============================================================================
 
@@ -395,21 +319,9 @@ function M.refresh(cb)
     vim.notify("[usage:claude_code] refresh: starting", vim.log.levels.DEBUG)
   end
 
-  -- 1. Load credentials → OAuth API
+  -- 1. Load credentials -> OAuth API
   local creds, creds_err = load_credentials(opts)
   if not creds then
-    if vim.g.codecompanion_debug then
-      vim.notify(string.format("[usage:claude_code] refresh: no creds (%s), cli_fallback=%s", tostring(creds_err), tostring(opts.allow_cli_fallback)), vim.log.levels.WARN)
-    end
-    if opts.allow_cli_fallback then
-      fetch_cli_simple_async(opts, function(data, err)
-        if vim.g.codecompanion_debug then
-          vim.notify(string.format("[usage:claude_code] refresh: CLI fallback result err=%s data=%s", tostring(err), tostring(data ~= nil)), vim.log.levels.DEBUG)
-        end
-        cb(normalize_cli_simple(data), err)
-      end)
-      return
-    end
     return cb(nil, creds_err)
   end
 
@@ -439,27 +351,9 @@ function M.refresh(cb)
         if snap and #snap.windows > 0 then
           return cb(snap, nil)
         end
-        -- No windows → try CLI
-        if opts.allow_cli_fallback then
-          if vim.g.codecompanion_debug then
-            vim.notify("[usage:claude_code] refresh: OAuth returned empty windows, trying CLI fallback", vim.log.levels.DEBUG)
-          end
-          return fetch_cli_simple_async(opts, function(d, _)
-            cb(normalize_cli_simple(d), nil)
-          end)
-        end
         return cb(nil, "Claude OAuth returned empty usage data")
       end
 
-      -- OAuth failed → CLI
-      if opts.allow_cli_fallback then
-        if vim.g.codecompanion_debug then
-          vim.notify("[usage:claude_code] refresh: OAuth failed, trying CLI fallback", vim.log.levels.DEBUG)
-        end
-        return fetch_cli_simple_async(opts, function(d, _)
-          cb(normalize_cli_simple(d), err)
-        end)
-      end
       cb(nil, err)
     end)
   end

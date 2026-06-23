@@ -4,7 +4,7 @@ A Neovim extension for [codecompanion.nvim](https://github.com/olimorris/codecom
 
 Shows usage statistics for:
 - **Codex** (OpenAI Codex CLI) – reads auth from `~/.codex/auth.json` and queries the Codex usage API
-- **Claude** (Anthropic Claude Code) – reads OAuth credentials from `~/.claude/.credentials.json` and queries the Anthropic OAuth usage API, with optional CLI fallback. The provider key is `claude_code` (matching the codecompanion.nvim adapter name).
+- **Claude** (Anthropic Claude Code) – reads OAuth credentials from `~/.claude/.credentials.json` and queries the Anthropic OAuth usage API. The provider key is `claude_code` (matching the codecompanion.nvim adapter name).
 
 Built following the architecture of [CodexBar](https://github.com/steipete/CodexBar).
 
@@ -39,11 +39,7 @@ Using **lazy.nvim**:
 Reads the Codex access token from `~/.codex/auth.json` (or `$CODEX_HOME/auth.json`) and calls the Codex usage API at `https://chatgpt.com/backend-api/wham/usage`. No token refresh is performed; if the token is expired, run `codex login` to refresh.
 
 ### Claude Provider
-Two data sources, tried in order:
-
-1. **OAuth API** (primary) – Reads the OAuth access token from `~/.claude/.credentials.json` and calls `https://api.anthropic.com/api/oauth/usage`. If the token is expired, it attempts a refresh via `https://platform.claude.com/v1/oauth/token` using the stored refresh token. Updated tokens are written back to the credentials file.
-
-2. **CLI fallback** (secondary, optional) – If OAuth is unavailable, runs `claude -p /usage --output-format json`. This slash command is handled locally by the Claude CLI (zero API turns) but returns limited information. When the session limit is hit, the error message is parsed to show "0% left" with the reset time.
+Reads the OAuth access token from `~/.claude/.credentials.json` and calls `https://api.anthropic.com/api/oauth/usage`. If the token is expired, it attempts a refresh via `https://platform.claude.com/v1/oauth/token` using the stored refresh token. Updated tokens are written back to the credentials file.
 
 > **Note:** The Claude OAuth token in `.credentials.json` may become stale because the Claude CLI does not always write refreshed tokens back to this file. If you see an authentication error, run `claude login` (or simply use `claude` interactively) to refresh your session, then try again.
 
@@ -69,8 +65,6 @@ require("codecompanion._extensions.usage").setup({
       -- credentials_path = "~/.claude/.credentials.json",
       -- usage_endpoint = "https://api.anthropic.com/api/oauth/usage",
       -- allow_token_refresh = true,
-      -- allow_cli_fallback = true,
-      -- cli_binary = "claude",
       -- timeout_ms = 10000,
     },
   },
@@ -113,7 +107,6 @@ For [lualine.nvim](https://github.com/nvim-lualine/lualine.nvim):
 - Neovim 0.9+
 - [codecompanion.nvim](https://github.com/olimorris/codecompanion.nvim)
 - `curl` (for API requests)
-- For Claude: `claude` CLI (optional, for fallback)
 
 ## License
 
