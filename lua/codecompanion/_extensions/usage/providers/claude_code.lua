@@ -216,7 +216,9 @@ end
 -- ============================================================================
 
 local function normalize_window(w, label, seconds)
-  if not w or w.utilization == nil then
+  -- Guard against userdata or non-table values (vim.json.decode can return
+  -- vim.NIL or other userdata for null/nested arrays in some API responses).
+  if type(w) ~= "table" or w.utilization == nil then
     return nil
   end
   local used = tonumber(w.utilization)
@@ -237,10 +239,26 @@ local function normalize_oauth_usage(data, creds)
   local windows = {}
 
   local function add(w, label, sec)
+    if type(w) ~= "table" then
+      if vim.g.codecompanion_debug then
+        vim.notify(
+          string.format("[usage:claude_code] normalize: skipping '%s' — expected table, got %s", label, type(w)),
+          vim.log.levels.DEBUG
+        )
+      end
+      return
+    end
     local n = normalize_window(w, label, sec)
     if n then
       table.insert(windows, n)
     end
+  end
+
+  if vim.g.codecompanion_debug then
+    vim.notify(
+      string.format("[usage:claude_code] normalize: raw keys=%s", vim.inspect(vim.tbl_keys(data or {}))),
+      vim.log.levels.DEBUG
+    )
   end
 
   add(data.five_hour, "5h", 5 * 3600)
