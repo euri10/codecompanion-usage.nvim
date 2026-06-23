@@ -119,12 +119,15 @@ local function normalize_quota(label, quota, seconds)
     return nil
   end
 
+  local reset_raw = quota.reset_at or quota.resets_at or quota.reset_time or quota.end_time
+  local reset_at = util.parse_iso8601(reset_raw)
+
   return {
     provider = "copilot_acp",
     label = label,
     used_percent = used_percent,
     remaining_percent = math.max(0, 100 - used_percent),
-    reset_at = nil,
+    reset_at = reset_at,
     limit_window_seconds = seconds,
   }
 end

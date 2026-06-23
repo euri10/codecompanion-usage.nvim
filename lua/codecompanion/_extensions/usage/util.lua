@@ -151,6 +151,50 @@ function M.jwt_exp(token)
   return nil
 end
 
+--- Parse an ISO-8601 timestamp string or numeric epoch → epoch seconds (UTC).
+--- Returns nil if unparseable.
+function M.parse_iso8601(s)
+  if s == nil or s == "" then
+    return nil
+  end
+  local n = tonumber(s)
+  if n then
+    -- Normalize milliseconds to seconds
+    return n > 100000000000 and math.floor(n / 1000) or n
+  end
+  if type(s) ~= "string" then
+    return nil
+  end
+  local year, month, day, hour, min, sec = s:match("^(%d+)%-(%d+)%-(%d+)T(%d+):(%d+):(%d+)")
+  if not year then
+    return nil
+  end
+  year, month, day = tonumber(year), tonumber(month), tonumber(day)
+  hour, min, sec = tonumber(hour), tonumber(min), tonumber(sec)
+  if not (year and month and day and hour and min and sec) then
+    return nil
+  end
+
+  local tz = 0
+  local sign, th, tm = s:match("([%+%-])(%d+):(%d+)$")
+  if sign then
+    tz = (sign == "-" and -1 or 1) * (tonumber(th) * 3600 + tonumber(tm) * 60)
+  end
+
+  local t = os.time({ year = year, month = month, day = day, hour = hour, min = min, sec = sec })
+  if not t then
+    return nil
+  end
+
+  local tz_string = tostring(os.date("%z"))
+  local tz_sign, tz_hour, tz_min = tz_string:match("^([%+%-])(%d%d)(%d%d)$")
+  local local_offset = 0
+  if tz_sign then
+    local_offset = (tz_sign == "-" and -1 or 1) * ((tonumber(tz_hour) or 0) * 3600 + (tonumber(tz_min) or 0) * 60)
+  end
+  return t - tz + local_offset
+end
+
 function M.format_reset(value)
   if value == nil then
     return nil
