@@ -102,7 +102,7 @@ local function calculate_usage_percent(entitlement, remaining)
   return (used / entitlement) * 100
 end
 
-local function normalize_quota(label, quota, seconds)
+local function normalize_quota(label, quota, seconds, fallback_reset_at)
   if type(quota) ~= "table" then
     return nil
   end
@@ -120,7 +120,11 @@ local function normalize_quota(label, quota, seconds)
   end
 
   local reset_raw = quota.reset_at or quota.resets_at or quota.reset_time or quota.end_time
-  local reset_at = util.parse_iso8601(reset_raw)
+  -- A value of 0 means "no rolling-window reset"; fall back to the top-level date.
+  if reset_raw == 0 then
+    reset_raw = nil
+  end
+  local reset_at = util.parse_iso8601(reset_raw) or fallback_reset_at
 
   return {
     provider = "copilot_acp",
@@ -140,30 +144,33 @@ local function normalize(data)
   local windows = {}
   local is_limited = data.access_type_sku == "free_limited_copilot"
 
+  -- Top-level monthly reset date used as fallback when per-quota reset_at is 0.
+  local monthly_reset_at = util.parse_iso8601(data.quota_reset_date_utc or data.quota_reset_date)
+
   if is_limited then
     -- Limited user quotas
-    local chat = normalize_quota("chat", data.limited_user_quotas and data.limited_user_quotas.chat, 30 * 86400)
+    local chat = normalize_quota("chat", data.limited_user_quotas and data.limited_user_quotas.chat, 30 * 86400, monthly_reset_at)
     if chat then
       table.insert(windows, chat)
     end
 
-    local completions = normalize_quota("completions", data.limited_user_quotas and data.limited_user_quotas.completions, 30 * 86400)
+    local completions = normalize_quota("completions", data.limited_user_quotas and data.limited_user_quotas.completions, 30 * 86400, monthly_reset_at)
     if completions then
       table.insert(windows, completions)
     end
   else
     -- Premium user quotas (quota_snapshots)
-    local premium = normalize_quota("premium", data.quota_snapshots and data.quota_snapshots.premium_interactions, 3600)
+    local premium = normalize_quota("premium", data.quota_snapshots and data.quota_snapshots.premium_interactions, 3600, monthly_reset_at)
     if premium then
       table.insert(windows, premium)
     end
 
-    local chat = normalize_quota("chat", data.quota_snapshots and data.quota_snapshots.chat, 30 * 86400)
+    local chat = normalize_quota("chat", data.quota_snapshots and data.quota_snapshots.chat, 30 * 86400, monthly_reset_at)
     if chat then
       table.insert(windows, chat)
     end
 
-    local completions = normalize_quota("completions", data.quota_snapshots and data.quota_snapshots.completions, 30 * 86400)
+    local completions = normalize_quota("completions", data.quota_snapshots and data.quota_snapshots.completions, 30 * 86400, monthly_reset_at)
     if completions then
       table.insert(windows, completions)
     end

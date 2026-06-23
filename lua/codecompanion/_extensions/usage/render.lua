@@ -244,7 +244,12 @@ local function format_window_bar(window, width)
     return escape_statusline(label .. ": n/a")
   end
 
-  return escape_statusline(label) .. " " .. colored_progress_bar(percent, width) .. " " .. percent_badge(percent)
+  local reset = util.format_reset(window.reset_at)
+  local bar = escape_statusline(label) .. " " .. colored_progress_bar(percent, width) .. " " .. percent_badge(percent)
+  if reset then
+    bar = bar .. escape_statusline(" (" .. reset .. ")")
+  end
+  return bar
 end
 
 local function snapshot_title(snapshot)
