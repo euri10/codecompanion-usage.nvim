@@ -4,7 +4,6 @@ local render = require "codecompanion._extensions.usage.render"
 local Extension = {}
 
 local defaults = {
-  command = "CodeCompanionUsage",
   default_provider = "codex",
   --- If true, auto-refresh usage when entering a codecompanion chat buffer
   --- and whenever the ACP config (model/mode/thought) changes.
@@ -15,7 +14,7 @@ local defaults = {
   refresh_interval_sec = 300,
   providers = {
     codex = { enabled = true },
-    claude = { enabled = true },
+    claude_code = { enabled = true },
   },
 }
 
@@ -29,8 +28,45 @@ local state = {
   _periodic_timer = nil,
 }
 
--- Global table for statusline consumption: _G.codecompanion_usage_stl[bufnr] = "codex 75%/50% 2.3d"
+-- Global table for statusline consumption: _G.codecompanion_usage_stl[bufnr] = "Codex > 5h: 89% (4.4h) W: 18% (1.8d)"
 _G.codecompanion_usage_stl = _G.codecompanion_usage_stl or {}
+
+local function canonical_provider_name(name)
+  if not name then
+    return nil
+  end
+
+  local normalized = tostring(name):lower():gsub("%s+", "_"):gsub("%-+", "_")
+  if normalized == "claude" then
+    return "claude_code"
+  end
+
+  return normalized
+end
+
+local function display_provider_name(name)
+  local canonical = canonical_provider_name(name)
+  if canonical == "claude_code" then
+    return "Claude"
+  end
+  if canonical == "codex" then
+    return "Codex"
+  end
+  if not canonical then
+    return "usage"
+  end
+
+  return canonical:gsub("_+", " "):gsub("^(%l)", string.upper)
+end
+
+local function normalize_provider_configs(provider_configs)
+  local normalized = {}
+  for name, provider_opts in pairs(provider_configs or {}) do
+    local canonical = canonical_provider_name(name)
+    normalized[canonical] = util.deep_extend(normalized[canonical] or {}, provider_opts or {})
+  end
+  return normalized
+end
 
 local function enabled_provider_names()
   local names = {}
@@ -58,6 +94,7 @@ end
 
 local function setup_providers()
   state.providers = {}
+  state.opts.providers = normalize_provider_configs(state.opts.providers)
   for name, provider_opts in pairs(state.opts.providers or {}) do
     if provider_opts.enabled ~= false then
       if vim.g.codecompanion_debug then
@@ -89,6 +126,7 @@ local function setup_providers()
 end
 
 local function refresh_provider(name, cb)
+  name = canonical_provider_name(name)
   local provider = state.providers[name]
   if not provider then
     cb(nil, "Provider is not enabled or unavailable: " .. tostring(name))
@@ -146,7 +184,7 @@ local function refresh_and_update_stl(provider_name, bufnr)
     vim.schedule(function()
       local text
       if err then
-        text = (state.opts.providers[provider_name] and state.opts.providers[provider_name].label or provider_name) .. " err"
+        text = display_provider_name(provider_name) .. " > err"
         if vim.g.codecompanion_debug then
           vim.notify(string.format("[usage] refresh_and_update_stl: '%s' error: %s", provider_name, tostring(err)), vim.log.levels.ERROR)
         end
@@ -159,7 +197,7 @@ local function refresh_and_update_stl(provider_name, bufnr)
           )
         end
       else
-        text = provider_name .. " n/a"
+        text = display_provider_name(provider_name) .. " > n/a"
         if vim.g.codecompanion_debug then
           vim.notify(string.format("[usage] refresh_and_update_stl: '%s' no snapshot, no error", provider_name), vim.log.levels.DEBUG)
         end
@@ -197,12 +235,12 @@ local function provider_for_adapter(adapter_name)
 
   -- Normalize adapter name to match provider keys:
   -- "Claude Code" → "claude_code", "claude_code" → "claude_code"
-  local normalized = adapter_name:lower():gsub("%s+", "_"):gsub("_+", "_")
+  local normalized = canonical_provider_name(adapter_name)
 
   local provider_names = {}
   for name, _ in pairs(state.providers) do
     table.insert(provider_names, name)
-    if name:lower() == normalized then
+    if name == normalized then
       if vim.g.codecompanion_debug then
         vim.notify(string.format("[usage] provider_for_adapter: '%s' matched provider '%s'", adapter_name, name), vim.log.levels.DEBUG)
       end
@@ -370,65 +408,9 @@ local function setup_periodic_refresh()
   )
 end
 
-local function insert_provider(name)
-  refresh_provider(name, function(snapshot, err)
-    vim.schedule(function()
-      if err then
-        return
-      end
-      util.insert_text(render.provider(snapshot))
-    end)
-  end)
-end
-
-local function insert_all()
-  refresh_all(function(snapshots)
-    vim.schedule(function()
-      util.insert_text(render.all(snapshots))
-    end)
-  end)
-end
-
-local function create_commands()
-  if not state.opts.command or state.opts.command == "" then
-    return
-  end
-
-  pcall(vim.api.nvim_del_user_command, state.opts.command)
-  pcall(vim.api.nvim_del_user_command, state.opts.command .. "Codex")
-  pcall(vim.api.nvim_del_user_command, state.opts.command .. "Claude")
-  pcall(vim.api.nvim_del_user_command, state.opts.command .. "ClaudeCode")
-
-  vim.api.nvim_create_user_command(state.opts.command, function(args)
-    if args.args and args.args ~= "" then
-      insert_provider(args.args)
-    else
-      insert_all()
-    end
-  end, {
-    nargs = "?",
-    complete = function()
-      return enabled_provider_names()
-    end,
-    desc = "Fetch and insert AI usage for enabled providers",
-  })
-
-  vim.api.nvim_create_user_command(state.opts.command .. "Codex", function()
-    insert_provider "codex"
-  end, { desc = "Fetch and insert Codex usage" })
-
-  vim.api.nvim_create_user_command(state.opts.command .. "Claude", function()
-    insert_provider "claude"
-  end, { desc = "Fetch and insert Claude usage" })
-
-  -- Alias for users who expect the adapter name as the command
-  vim.api.nvim_create_user_command(state.opts.command .. "ClaudeCode", function()
-    insert_provider "claude"
-  end, { desc = "Fetch and insert Claude usage (alias)" })
-end
-
 function Extension.setup(opts)
   state.opts = util.deep_extend(defaults, opts or {})
+  state.opts.default_provider = canonical_provider_name(state.opts.default_provider)
   if vim.g.codecompanion_debug then
     local provider_names = {}
     for name, p_opts in pairs(state.opts.providers or {}) do
@@ -444,7 +426,6 @@ function Extension.setup(opts)
     )
   end
   setup_providers()
-  create_commands()
   setup_auto_refresh()
   setup_periodic_refresh()
 end
@@ -461,9 +442,10 @@ end
 ---@param provider_name string
 ---@return string
 local function statusline_for_provider(provider_name)
-  local snapshot = state.last_snapshots[provider_name]
+  local canonical = canonical_provider_name(provider_name)
+  local snapshot = state.last_snapshots[canonical]
   if not snapshot then
-    return provider_name .. " n/a"
+    return display_provider_name(provider_name) .. " > n/a"
   end
   return render.compact(snapshot)
 end
@@ -473,15 +455,15 @@ Extension.exports = {
   refresh_all = refresh_all,
 
   last_snapshot = function(provider)
-    return state.last_snapshots[provider or state.opts.default_provider]
+    return state.last_snapshots[canonical_provider_name(provider or state.opts.default_provider)]
   end,
 
   last_error = function(provider)
-    return state.last_errors[provider or state.opts.default_provider]
+    return state.last_errors[canonical_provider_name(provider or state.opts.default_provider)]
   end,
 
   last_refreshed_at = function(provider)
-    return state.last_refreshed_at[provider or state.opts.default_provider]
+    return state.last_refreshed_at[canonical_provider_name(provider or state.opts.default_provider)]
   end,
 
   ---Return compact statusline text for the adapter active in the current buffer.

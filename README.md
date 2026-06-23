@@ -4,7 +4,7 @@ A Neovim extension for [codecompanion.nvim](https://github.com/olimorris/codecom
 
 Shows usage statistics for:
 - **Codex** (OpenAI Codex CLI) – reads auth from `~/.codex/auth.json` and queries the Codex usage API
-- **Claude** (Anthropic Claude Code) – reads OAuth credentials from `~/.claude/.credentials.json` and queries the Anthropic OAuth usage API. The provider key is `claude_code` (matching the codecompanion.nvim adapter name).
+- **Claude** (Anthropic Claude Code) – reads OAuth credentials from `~/.claude/.credentials.json` and queries the Anthropic OAuth usage API. The canonical provider key is `claude_code`; the legacy `claude` alias is still accepted.
 
 Built following the architecture of [CodexBar](https://github.com/steipete/CodexBar).
 
@@ -21,7 +21,6 @@ Using **lazy.nvim**:
       "your-username/codecompanion-usage.nvim",
       config = function()
         require("codecompanion._extensions.usage").setup({
-          -- optional overrides
           providers = {
             codex = { enabled = true },
             claude_code = { enabled = true },
@@ -47,7 +46,6 @@ Reads the OAuth access token from `~/.claude/.credentials.json` and calls `https
 
 ```lua
 require("codecompanion._extensions.usage").setup({
-  command = "CodeCompanionUsage",   -- :CodeCompanionUsage to refresh manually
   default_provider = "codex",       -- or "claude_code"
   auto_refresh = true,
   auto_refresh_debounce_ms = 2000,
@@ -71,7 +69,7 @@ require("codecompanion._extensions.usage").setup({
 })
 ```
 
-> **Backward compatibility:** The legacy provider key `claude` is automatically mapped to `claude_code`. Existing configurations using `claude = { enabled = true }` will continue to work.
+> **Backward compatibility:** The legacy provider key `claude` is normalized to `claude_code`. Existing configurations using `claude = { enabled = true }` will continue to work.
 
 ## Statusline
 
@@ -98,9 +96,11 @@ For [lualine.nvim](https://github.com/nvim-lualine/lualine.nvim):
 }
 ```
 
-## Commands
+The compact render is provider-agnostic and uses the same shape for Codex and Claude, for example:
 
-- `:CodeCompanionUsage` – Manually refresh usage for all enabled providers
+```text
+Codex > 5h: 89% (4.4h) W: 18% (1.8d)
+```
 
 ## Requirements
 

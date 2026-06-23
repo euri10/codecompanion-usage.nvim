@@ -2,6 +2,31 @@ local util = require("codecompanion._extensions.usage.util")
 
 local M = {}
 
+local function compact_label(label)
+  if type(label) ~= "string" or label == "" then
+    return nil
+  end
+
+  local normalized = label:lower()
+  if normalized == "weekly" then
+    return "W"
+  end
+
+  return label
+end
+
+local function percentage_text(value)
+  if value == nil then
+    return nil
+  end
+
+  return string.format("%.0f%%", value)
+end
+
+local function escape_statusline(text)
+  return (text:gsub("%%", "%%%%"))
+end
+
 local function format_window(window)
   if not window then
     return nil
@@ -11,24 +36,29 @@ local function format_window(window)
     return "not implemented"
   end
 
+  local label = compact_label(window.label)
   local used = window.used_percent
   local remaining = window.remaining_percent
   local reset = util.format_reset(window.reset_at)
 
   local usage
   if remaining then
-    usage = string.format("%.0f%% left", remaining)
+    usage = percentage_text(remaining)
   elseif used then
-    usage = string.format("%.0f%% used", used)
+    usage = percentage_text(used)
   else
     usage = "n/a"
   end
 
-  if reset then
-    return string.format("%s: %s, resets in %s", window.label, usage, reset)
+  if not label then
+    return nil
   end
 
-  return string.format("%s: %s", window.label, usage)
+  if reset then
+    return string.format("%s: %s (%s)", label, usage, reset)
+  end
+
+  return string.format("%s: %s", label, usage)
 end
 
 function M.provider(snapshot)
@@ -108,40 +138,42 @@ end
 ---@return string
 function M.compact(snapshot)
   if not snapshot then
-    return "usage n/a"
+    return escape_statusline("usage > n/a")
   end
 
   local provider = snapshot.provider_label or snapshot.provider or "usage"
 
   if snapshot.not_implemented then
-    return provider .. " n/a"
+    return escape_statusline(provider .. " > n/a")
   end
 
   if snapshot.error then
-    return provider .. " err"
+    return escape_statusline(provider .. " > err")
   end
 
   local first = snapshot.windows and snapshot.windows[1]
   local second = snapshot.windows and snapshot.windows[2]
 
   if first and first.not_implemented then
-    return provider .. " n/a"
+    return escape_statusline(provider .. " > n/a")
   end
 
-  local p = first and first.remaining_percent
-  local s = second and second.remaining_percent
-  local reset = second and util.format_reset(second.reset_at)
+  local parts = {}
+  local first_formatted = format_window(first)
+  local second_formatted = format_window(second)
 
-  -- Emit escaped percent signs so the statusline renders a literal "%".
-  if p and s then
-    return string.format("%s %.0f%%%%/%.0f%%%%%s", provider, p, s, reset and (" " .. reset) or "")
+  if first_formatted then
+    table.insert(parts, first_formatted)
+  end
+  if second_formatted then
+    table.insert(parts, second_formatted)
   end
 
-  if p then
-    return string.format("%s %.0f%%%%%s", provider, p, reset and (" " .. reset) or "")
+  if #parts == 0 then
+    return escape_statusline(provider .. " > n/a")
   end
 
-  return provider .. " n/a"
+  return escape_statusline(provider .. " > " .. table.concat(parts, " "))
 end
 
 return M
