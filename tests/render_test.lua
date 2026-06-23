@@ -19,7 +19,7 @@ assert_eq(render.progress_bar(83, 12), "█████████░░░", "
 assert_eq(render.progress_bar(0, 12), "░░░░░░░░░░░░", "0% should leave the bar empty")
 
 local colored = render.colored_progress_bar(83, 12)
-assert_match(colored, "%%#CodeCompanionUsageBarFill_12_1#", "colored bar should emit highlight groups")
+assert_match(colored, "%%#CodeCompanionUsageBarFill_12_83#", "colored bar should emit one fill highlight for the whole bar")
 assert_match(colored, "█", "colored bar should contain filled cells")
 assert_match(colored, "░", "colored bar should contain empty cells")
 
@@ -35,6 +35,7 @@ local snapshot = {
 
 local statusline = render.bar(snapshot, { width = 12 })
 assert_match(statusline, "^Codex %>%s*5h ", "bar output should keep the provider and window labels")
-assert_match(statusline, "%%#CodeCompanionUsageBarFill_12_1#", "bar output should keep highlight escapes")
+assert_match(statusline, "%%#CodeCompanionUsageBarFill_12_83#", "bar output should use one fill color")
+assert_match(statusline, "%%#CodeCompanionUsageBarPercent#83%%*", "bar output should include the numeric percent badge")
 
 print("render_test.lua passed")

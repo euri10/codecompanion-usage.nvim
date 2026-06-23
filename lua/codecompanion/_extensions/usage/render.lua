@@ -3,6 +3,8 @@ local util = require("codecompanion._extensions.usage.util")
 local M = {}
 
 local bar_hl_cache = {}
+local percent_hl_name = "CodeCompanionUsageBarPercent"
+local empty_bar_hl_name = "CodeCompanionUsageBarEmpty"
 
 local function compact_label(label)
   if type(label) ~= "string" or label == "" then
@@ -37,6 +39,14 @@ local function clamp_percent(value)
   return math.max(0, math.min(100, n))
 end
 
+local function rounded_percent(value)
+  local n = clamp_percent(value)
+  if n == nil then
+    return nil
+  end
+  return math.floor(n + 0.5)
+end
+
 local function hex_to_rgb(hex)
   local cleaned = tostring(hex):gsub("^#", "")
   if #cleaned ~= 6 then
@@ -61,19 +71,19 @@ local function lerp(a, b, t)
   return a + (b - a) * t
 end
 
-local function gradient_color(t)
-  t = math.max(0, math.min(1, tonumber(t) or 0))
+local function percent_to_color(percent)
+  local t = math.max(0, math.min(1, (tonumber(percent) or 0) / 100))
 
-  local green = { hex_to_rgb("#2ecc71") }
-  local yellow = { hex_to_rgb("#f1c40f") }
   local red = { hex_to_rgb("#e74c3c") }
+  local yellow = { hex_to_rgb("#f1c40f") }
+  local green = { hex_to_rgb("#2ecc71") }
 
   if t >= 0.5 then
     local local_t = (t - 0.5) / 0.5
     return rgb_to_hex(
-      lerp(green[1], yellow[1], local_t),
-      lerp(green[2], yellow[2], local_t),
-      lerp(green[3], yellow[3], local_t)
+      lerp(yellow[1], green[1], local_t),
+      lerp(yellow[2], green[2], local_t),
+      lerp(yellow[3], green[3], local_t)
     )
   end
 
@@ -89,23 +99,30 @@ local function hl(group)
   return "%#" .. group .. "#"
 end
 
-local function ensure_bar_highlights(width)
+local function ensure_bar_highlights(width, percent)
   width = math.max(1, math.floor(tonumber(width) or 12))
 
-  if bar_hl_cache[width] then
-    return bar_hl_cache[width]
+  local percent_key = rounded_percent(percent) or 0
+  local cache_key = string.format("%d:%d", width, percent_key)
+  if bar_hl_cache[cache_key] then
+    return bar_hl_cache[cache_key]
   end
 
-  local groups = {}
-  for i = 1, width do
-    local ratio = width == 1 and 1 or (i - 1) / (width - 1)
-    local group = string.format("CodeCompanionUsageBarFill_%d_%d", width, i)
-    vim.api.nvim_set_hl(0, group, { fg = gradient_color(ratio) })
-    groups[i] = group
+  local fill_group = string.format("CodeCompanionUsageBarFill_%d_%d", width, percent_key)
+  vim.api.nvim_set_hl(0, fill_group, { fg = percent_to_color(percent_key), bold = true })
+
+  if not bar_hl_cache.empty then
+    vim.api.nvim_set_hl(0, empty_bar_hl_name, { fg = "#5c6370" })
+    vim.api.nvim_set_hl(0, percent_hl_name, { fg = "#f5f7ff", bold = true })
+    bar_hl_cache.empty = true
   end
 
-  vim.api.nvim_set_hl(0, "CodeCompanionUsageBarEmpty", { fg = "#5c6370" })
-  bar_hl_cache[width] = groups
+  local groups = {
+    fill = fill_group,
+    empty = empty_bar_hl_name,
+    percent = percent_hl_name,
+  }
+  bar_hl_cache[cache_key] = groups
   return groups
 end
 
@@ -180,28 +197,31 @@ end
 
 local function colored_progress_bar(percent, width)
   width = math.max(1, math.floor(tonumber(width) or 12))
-  ensure_bar_highlights(width)
+  local groups = ensure_bar_highlights(width, percent)
   percent = clamp_percent(percent)
   if percent == nil then
-    return hl("CodeCompanionUsageBarEmpty") .. string.rep("░", width) .. "%*"
+    return hl(empty_bar_hl_name) .. string.rep("░", width) .. "%*"
   end
 
-  local groups = bar_hl_cache[width]
   local filled = math.floor((percent / 100) * width + 1e-9)
   if percent >= 100 then
     filled = width
   end
 
   local parts = {}
-  for i = 1, width do
-    if i <= filled then
-      parts[#parts + 1] = hl(groups[i]) .. "█"
-    else
-      parts[#parts + 1] = hl("CodeCompanionUsageBarEmpty") .. "░"
-    end
-  end
+  parts[#parts + 1] = hl(groups.fill) .. string.rep("█", filled)
+  parts[#parts + 1] = hl(groups.empty) .. string.rep("░", width - filled)
   parts[#parts + 1] = "%*"
   return table.concat(parts)
+end
+
+local function percent_badge(percent)
+  percent = rounded_percent(percent)
+  if percent == nil then
+    return hl(percent_hl_name) .. "n/a" .. "%*"
+  end
+
+  return hl(percent_hl_name) .. tostring(percent) .. "%*"
 end
 
 local function format_window_bar(window, width)
@@ -224,7 +244,7 @@ local function format_window_bar(window, width)
     return escape_statusline(label .. ": n/a")
   end
 
-  return escape_statusline(label) .. " " .. colored_progress_bar(percent, width)
+  return escape_statusline(label) .. " " .. colored_progress_bar(percent, width) .. " " .. percent_badge(percent)
 end
 
 local function snapshot_title(snapshot)

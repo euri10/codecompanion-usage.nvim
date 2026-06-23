@@ -103,6 +103,7 @@ Codex > 5h: 89% (4.4h) W: 18% (1.8d)
 ```
 
 If you set `statusline_style = "bar"`, the extension emits a statusline-safe progress bar instead of the percentage text. The bar uses Neovim highlight sequences, so it works in a statusline consumer that preserves `%#...#` syntax. If your consumer strips statusline escapes, you will still see the block characters but not the colors.
+The bar is a single fill color chosen from the overall percentage, with the numeric percent shown separately as a plain number.
 
 ## Requirements
 
