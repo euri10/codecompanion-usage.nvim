@@ -139,6 +139,86 @@ The bar is a single fill color chosen from the overall percentage, with the nume
 
 ![Status bar progress mode](./screenshots/statusbar-progress-mode.png)
 
+## Comparison Commands
+
+This extension provides two user commands (registered automatically when you call `.setup()`) to compare your configured providers and determine which ACP provider offers the longest possible session without interruption:
+
+### `:CodeCompanionUsageCompare`
+
+Fetches fresh usage data from **all** enabled providers, displays a summary of each, and then compares the ACP providers (Copilot vs DeepSeek) to recommend which one can sustain the longest uninterrupted session.
+
+Example output:
+
+```
+╔══════════════════════════════════════════╗
+║     AI Provider Usage Comparison        ║
+╚══════════════════════════════════════════╝
+
+  - Codex (plus):
+      5h: 89% left (window: 5.0h)
+      weekly: 18% left (window: 7.0d)
+      → session: ~4.4h before hitting 5h limit
+
+  - Claude (Pro):
+      5h: 75% left (window: 5.0h)
+      weekly: 60% left (window: 7.0d)
+      → session: ~3.8h before hitting 5h limit
+
+  - Copilot (Free Limited Copilot):
+      premium_interactions: 100% left (window: 1.0h)
+      chat: 85% left (window: 30.0d)
+      completions: 90% left (window: 30.0d)
+      → session: ~1.0h before hitting premium_interactions limit
+
+  - DeepSeek:
+      balance: USD 5.20
+      → session: $5.20 remaining (no time-based limit)
+
+─── ACP Provider Comparison ───
+
+  Copilot (Time Window): bottleneck=premium_interactions, remaining=100%, window=1.0h, est.session=~1.0h
+  DeepSeek (Balance): $5.20 remaining
+
+  ★ Recommended: DeepSeek
+    DeepSeek has no time-based limits. You can use it continuously until the balance is depleted ($5.20 remaining).
+```
+
+### `:CodeCompanionUsageCompareACP`
+
+A focused version that only refreshes and compares the ACP providers (Copilot and DeepSeek), omitting any non-ACP providers from the output.
+
+### Programmatic Usage
+
+You can also call the comparison functions directly from Lua:
+
+```lua
+-- Trigger a full comparison report (async, uses vim.notify)
+require("codecompanion._extensions.usage.compare").report()
+
+-- Trigger an ACP-only comparison report
+require("codecompanion._extensions.usage.compare").report_acp()
+
+-- Get the comparison result synchronously from cached data (no refresh)
+local result, err = require("codecompanion._extensions.usage.compare").compare_now()
+if result then
+  print("Recommended: " .. result.recommendation)
+  print(result.recommendation_text)
+end
+```
+
+The `compare_now()` function returns a table with:
+- `providers`: list of session estimates for each ACP provider
+- `recommendation`: the provider key (e.g. `"deepseek_acp"`) that offers the longest session
+- `recommendation_text`: human-readable explanation of the recommendation
+
+### How the Comparison Works
+
+The comparison algorithm identifies the **bottleneck window** for each provider — the usage limit that will be hit first. For time-window-based providers (Codex, Claude, Copilot), this is the window with the lowest remaining percentage weighted by window duration. For balance-based providers (DeepSeek), it's simply the remaining monetary balance.
+
+The recommendation is based on which ACP provider gives you the most headroom:
+- **Time-window providers**: Higher remaining percentage in a longer window = more capacity.
+- **Balance providers**: Higher remaining balance = more usage available, with the added benefit of no time-based rate limits.
+
 ## Requirements
 
 - Neovim 0.9+

@@ -1,5 +1,6 @@
 local util = require "codecompanion._extensions.usage.util"
 local render = require "codecompanion._extensions.usage.render"
+local compare = require "codecompanion._extensions.usage.compare"
 
 local Extension = {}
 
@@ -463,6 +464,9 @@ function Extension.setup(opts)
   setup_providers()
   setup_auto_refresh()
   setup_periodic_refresh()
+
+  -- Register comparison commands
+  pcall(compare.setup_commands)
 end
 
 ---Get the compact statusline text for the adapter in the current (or given) buffer.
