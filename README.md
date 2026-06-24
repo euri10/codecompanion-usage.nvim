@@ -139,19 +139,19 @@ The bar is a single fill color chosen from the overall percentage, with the nume
 
 ![Status bar progress mode](./screenshots/statusbar-progress-mode.png)
 
-## Comparison Commands
+## Comparison Command
 
-This extension provides two user commands (registered automatically when you call `.setup()`) to compare your configured providers and determine which ACP provider offers the longest possible session without interruption:
+The extension provides a single command (auto-registered on `.setup()`) to compare all your configured providers and recommend the one that offers the longest uninterrupted session:
 
 ### `:CodeCompanionUsageCompare`
 
-Fetches fresh usage data from **all** enabled providers, displays a summary of each, and then compares the ACP providers (Copilot vs DeepSeek) to recommend which one can sustain the longest uninterrupted session.
+Fetches fresh usage data from all enabled providers, displays a summary of each, and recommends the provider that can sustain the longest session.
 
 Example output:
 
 ```
 ╔══════════════════════════════════════════╗
-║     AI Provider Usage Comparison        ║
+║        AI Provider Usage Comparison     ║
 ╚══════════════════════════════════════════╝
 
   - Codex (plus):
@@ -174,50 +174,41 @@ Example output:
       balance: USD 5.20
       → session: $5.20 remaining (no time-based limit)
 
-─── ACP Provider Comparison ───
+─── Recommendation ───
 
-  Copilot (Time Window): bottleneck=premium_interactions, remaining=100%, window=1.0h, est.session=~1.0h
+  Copilot: bottleneck=premium_interactions, remaining=100%, window=1.0h, est.session=~1.0h
   DeepSeek (Balance): $5.20 remaining
 
-  ★ Recommended: DeepSeek
-    DeepSeek has no time-based limits. You can use it continuously until the balance is depleted ($5.20 remaining).
+  ★ Best choice: DeepSeek
+    DeepSeek has no time-based limits. Use it continuously until the balance is depleted ($5.20 remaining).
 ```
-
-### `:CodeCompanionUsageCompareACP`
-
-A focused version that only refreshes and compares the ACP providers (Copilot and DeepSeek), omitting any non-ACP providers from the output.
 
 ### Programmatic Usage
 
-You can also call the comparison functions directly from Lua:
-
 ```lua
--- Trigger a full comparison report (async, uses vim.notify)
+-- Trigger a comparison report (async, uses vim.notify)
 require("codecompanion._extensions.usage.compare").report()
-
--- Trigger an ACP-only comparison report
-require("codecompanion._extensions.usage.compare").report_acp()
 
 -- Get the comparison result synchronously from cached data (no refresh)
 local result, err = require("codecompanion._extensions.usage.compare").compare_now()
 if result then
-  print("Recommended: " .. result.recommendation)
+  print("Best provider: " .. result.recommendation)
   print(result.recommendation_text)
 end
 ```
 
-The `compare_now()` function returns a table with:
-- `providers`: list of session estimates for each ACP provider
-- `recommendation`: the provider key (e.g. `"deepseek_acp"`) that offers the longest session
-- `recommendation_text`: human-readable explanation of the recommendation
+`compare_now()` returns a table with:
+- `providers`: list of session estimates for each provider
+- `recommendation`: the provider key (e.g. `"deepseek_acp"`) offering the longest session
+- `recommendation_text`: human-readable explanation
 
-### How the Comparison Works
+### How It Works
 
-The comparison algorithm identifies the **bottleneck window** for each provider — the usage limit that will be hit first. For time-window-based providers (Codex, Claude, Copilot), this is the window with the lowest remaining percentage weighted by window duration. For balance-based providers (DeepSeek), it's simply the remaining monetary balance.
+The comparison identifies the **bottleneck window** for each provider — the usage limit that will be hit first. For time-window-based providers (Codex, Claude, Copilot), this is the window with the lowest remaining percentage weighted by duration. For balance-based providers (DeepSeek), it's the remaining monetary balance.
 
-The recommendation is based on which ACP provider gives you the most headroom:
+The recommendation scores each provider and picks the one with the most headroom:
 - **Time-window providers**: Higher remaining percentage in a longer window = more capacity.
-- **Balance providers**: Higher remaining balance = more usage available, with the added benefit of no time-based rate limits.
+- **Balance providers**: Higher remaining balance = more usage, with no time-based rate limits.
 
 ## Requirements
 

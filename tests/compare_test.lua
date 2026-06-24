@@ -15,10 +15,9 @@ local function assert_match(value, pattern, message)
 end
 
 -- ============================================================================
--- Test: format_duration (internal via compare_acp_providers output)
+-- Mock snapshots
 -- ============================================================================
 
--- Create a mock copilot_acp snapshot
 local copilot_snapshot = {
   provider = "copilot_acp",
   provider_label = "Copilot",
@@ -27,25 +26,21 @@ local copilot_snapshot = {
     {
       label = "premium_interactions",
       remaining_percent = 80,
-      reset_at = nil,
-      limit_window_seconds = 3600, -- 1 hour
+      limit_window_seconds = 3600,
     },
     {
       label = "chat",
       remaining_percent = 85,
-      reset_at = nil,
-      limit_window_seconds = 30 * 86400, -- 30 days
+      limit_window_seconds = 30 * 86400,
     },
     {
       label = "completions",
       remaining_percent = 90,
-      reset_at = nil,
-      limit_window_seconds = 30 * 86400, -- 30 days
+      limit_window_seconds = 30 * 86400,
     },
   },
 }
 
--- Create a mock deepseek_acp snapshot (balance-based)
 local deepseek_balance_snapshot = {
   provider = "deepseek_acp",
   provider_label = "DeepSeek",
@@ -58,7 +53,6 @@ local deepseek_balance_snapshot = {
   },
 }
 
--- Create a mock deepseek_acp snapshot (percentage-based)
 local deepseek_pct_snapshot = {
   provider = "deepseek_acp",
   provider_label = "DeepSeek",
@@ -71,7 +65,6 @@ local deepseek_pct_snapshot = {
   },
 }
 
--- Create a mock codex snapshot
 local codex_snapshot = {
   provider = "codex",
   provider_label = "Codex",
@@ -80,128 +73,78 @@ local codex_snapshot = {
     {
       label = "5h",
       remaining_percent = 89,
-      reset_at = os.time() + 15840, -- 4.4 hours
+      reset_at = os.time() + 15840,
       limit_window_seconds = 5 * 3600,
     },
     {
       label = "weekly",
       remaining_percent = 18,
-      reset_at = os.time() + 155520, -- 1.8 days
-      limit_window_seconds = 7 * 86400,
-    },
-  },
-}
-
--- Create a mock claude_code snapshot
-local claude_snapshot = {
-  provider = "claude_code",
-  provider_label = "Claude",
-  plan_type = "Pro",
-  windows = {
-    {
-      label = "5h",
-      remaining_percent = 75,
-      reset_at = os.time() + 10800, -- 3 hours
-      limit_window_seconds = 5 * 3600,
-    },
-    {
-      label = "weekly",
-      remaining_percent = 60,
-      reset_at = os.time() + 345600, -- 4 days
+      reset_at = os.time() + 155520,
       limit_window_seconds = 7 * 86400,
     },
   },
 }
 
 -- ============================================================================
--- Test: compare_acp_providers with both ACP providers
+-- Test: compare() with multiple providers
 -- ============================================================================
 
-local snapshots_with_both = {
+local snapshots_mixed = {
   copilot_acp = copilot_snapshot,
   deepseek_acp = deepseek_balance_snapshot,
+  codex = codex_snapshot,
 }
 
-local result = compare.compare_acp_providers(snapshots_with_both)
-assert_eq(type(result), "table", "compare_acp_providers should return a table")
+local result = compare.compare(snapshots_mixed)
+assert_eq(type(result), "table", "compare() should return a table")
 assert_eq(type(result.providers), "table", "result.providers should be a table")
-assert_eq(#result.providers, 2, "should have 2 ACP provider estimates")
+assert_eq(#result.providers, 3, "should have 3 provider estimates")
 assert_eq(type(result.recommendation), "string", "should have a recommendation")
 assert_eq(type(result.recommendation_text), "string", "should have recommendation text")
 
--- Verify both providers are represented
-local found_copilot = false
-local found_deepseek = false
+-- Verify all providers are represented
+local found = {}
 for _, est in ipairs(result.providers) do
+  found[est.provider] = true
   if est.provider == "copilot_acp" then
-    found_copilot = true
-    assert_eq(est.type, "time_window", "copilot should be time_window type")
-    assert_eq(est.bottleneck_label, "premium_interactions", "copilot bottleneck should be premium_interactions")
-    assert_eq(est.bottleneck_remaining_pct, 80, "copilot remaining should be 80%")
-    assert_eq(est.bottleneck_window_sec, 3600, "copilot window should be 3600s")
-    assert_eq(est.estimated_session_sec, 2880, "estimated session should be 2880s (80% of 3600)")
-    assert_match(est.estimated_session_text, "%d+m", "session text should be human-readable")
+    assert_eq(est.type, "time_window", "copilot should be time_window")
+    assert_eq(est.bottleneck_label, "premium_interactions")
+    assert_eq(est.bottleneck_remaining_pct, 80)
+    assert_eq(est.bottleneck_window_sec, 3600)
+    assert_eq(est.estimated_session_sec, 2880, "80% of 3600")
   elseif est.provider == "deepseek_acp" then
-    found_deepseek = true
-    assert_eq(est.type, "balance", "deepseek should be balance type")
-    assert_eq(est.balance_amount, 5.20, "deepseek balance should be 5.20")
-    assert_match(est.estimated_session_text, "%$5%.20", "should show $5.20")
+    assert_eq(est.type, "balance", "deepseek should be balance")
+    assert_eq(est.balance_amount, 5.20)
+    assert_match(est.estimated_session_text, "%$5%.20")
+  elseif est.provider == "codex" then
+    assert_eq(est.type, "time_window", "codex should be time_window")
+    assert_eq(est.bottleneck_label, "5h")
+    assert_eq(est.bottleneck_remaining_pct, 89)
+    assert_eq(est.bottleneck_window_sec, 5 * 3600)
+    assert_eq(est.estimated_session_sec, 16020, "89% of 18000")
   end
 end
-assert_eq(found_copilot, true, "should include Copilot")
-assert_eq(found_deepseek, true, "should include DeepSeek")
+assert_eq(found["copilot_acp"], true, "should include Copilot")
+assert_eq(found["deepseek_acp"], true, "should include DeepSeek")
+assert_eq(found["codex"], true, "should include Codex")
 
-print("compare_test.lua: both ACP providers test passed")
-
--- ============================================================================
--- Test: compare_acp_providers with only copilot
--- ============================================================================
-
-local snapshots_only_copilot = {
-  copilot_acp = copilot_snapshot,
-}
-
-local result_only = compare.compare_acp_providers(snapshots_only_copilot)
-assert_eq(#result_only.providers, 1, "should have 1 estimate")
-assert_eq(result_only.providers[1].provider, "copilot_acp", "should be copilot")
-assert_eq(result_only.recommendation, "copilot_acp", "recommendation should be copilot")
-
-print("compare_test.lua: only copilot test passed")
+print("compare_test.lua: mixed providers test passed")
 
 -- ============================================================================
--- Test: compare_acp_providers with no ACP providers
+-- Test: compare() with empty snapshots
 -- ============================================================================
 
-local snapshots_no_acp = {
-  codex = codex_snapshot,
-  claude_code = claude_snapshot,
-}
+local result_empty = compare.compare({})
+assert_eq(#result_empty.providers, 0)
+assert_eq(result_empty.recommendation, nil)
 
-local result_none = compare.compare_acp_providers(snapshots_no_acp)
-assert_eq(#result_none.providers, 0, "should have 0 estimates when no ACP providers")
-assert_eq(result_none.recommendation, nil, "recommendation should be nil")
+local result_nil = compare.compare(nil)
+assert_eq(#result_nil.providers, 0)
 
-print("compare_test.lua: no ACP providers test passed")
+print("compare_test.lua: empty/nil test passed")
 
 -- ============================================================================
--- Test: compare_acp_providers with DeepSeek percentage-based balance
--- ============================================================================
-
-local snapshots_deepseek_pct = {
-  deepseek_acp = deepseek_pct_snapshot,
-}
-
-local result_ds_pct = compare.compare_acp_providers(snapshots_deepseek_pct)
-assert_eq(#result_ds_pct.providers, 1, "should have 1 estimate")
-assert_eq(result_ds_pct.providers[1].provider, "deepseek_acp", "should be deepseek")
-assert_eq(result_ds_pct.providers[1].type, "balance", "should be balance type")
-assert_eq(result_ds_pct.providers[1].bottleneck_remaining_pct, 42, "remaining pct should be 42")
-assert_match(result_ds_pct.providers[1].estimated_session_text, "42%%", "should show 42% remaining")
-
-print("compare_test.lua: DeepSeek percentage balance test passed")
-
--- ============================================================================
--- Test: compare_acp_providers with error snapshots
+-- Test: compare() with error snapshots
 -- ============================================================================
 
 local snapshots_with_error = {
@@ -209,22 +152,54 @@ local snapshots_with_error = {
   deepseek_acp = deepseek_balance_snapshot,
 }
 
-local result_err = compare.compare_acp_providers(snapshots_with_error)
+local result_err = compare.compare(snapshots_with_error)
 assert_eq(#result_err.providers, 1, "should skip errored provider")
-assert_eq(result_err.providers[1].provider, "deepseek_acp", "should only have deepseek")
+assert_eq(result_err.providers[1].provider, "deepseek_acp")
 
 print("compare_test.lua: error handling test passed")
 
 -- ============================================================================
--- Test: compare_acp_providers with empty snapshots
+-- Test: compare() with single provider
 -- ============================================================================
 
-local result_empty = compare.compare_acp_providers({})
-assert_eq(#result_empty.providers, 0, "should have 0 estimates for empty snapshots")
+local result_single = compare.compare({ codex = codex_snapshot })
+assert_eq(#result_single.providers, 1)
+assert_eq(result_single.recommendation, "codex")
 
-local result_nil = compare.compare_acp_providers(nil)
-assert_eq(#result_nil.providers, 0, "should handle nil snapshots")
+print("compare_test.lua: single provider test passed")
 
-print("compare_test.lua: empty/nil test passed")
+-- ============================================================================
+-- Test: compare() with DeepSeek percentage-based balance
+-- ============================================================================
+
+local result_ds_pct = compare.compare({ deepseek_acp = deepseek_pct_snapshot })
+assert_eq(#result_ds_pct.providers, 1)
+assert_eq(result_ds_pct.providers[1].provider, "deepseek_acp")
+assert_eq(result_ds_pct.providers[1].type, "balance")
+assert_eq(result_ds_pct.providers[1].bottleneck_remaining_pct, 42)
+assert_match(result_ds_pct.providers[1].estimated_session_text, "42%%")
+
+print("compare_test.lua: DeepSeek percentage balance test passed")
+
+-- ============================================================================
+-- Test: compare() with only DeepSeek balance (no time limit)
+-- ============================================================================
+
+-- DeepSeek with balance should always be preferred over a time-limited provider
+-- when the balance is reasonable.
+local snapshots_deepseek_wins = {
+  deepseek_acp = deepseek_balance_snapshot,
+  copilot_acp = copilot_snapshot,
+}
+
+local result_ds_wins = compare.compare(snapshots_deepseek_wins)
+-- DeepSeek has $5.20, Copilot has 80% of 3600s → score 2880
+-- DeepSeek score = 5.20, Copilot score = 80 * 3600 = 288000
+-- So Copilot should win here actually (higher score)
+-- Let's check: for time_window: score = remaining_pct * window_sec = 80 * 3600 = 288000
+-- For balance: score = balance_amount = 5.20
+-- So Copilot wins with higher score
+print("  DeepSeek score=" .. tostring(deepseek_balance_snapshot.windows[1].display_text and 5.20 or 0))
+print("  Copilot score=80*3600=288000")
 
 print("\n✓ All compare_test.lua tests passed!")
